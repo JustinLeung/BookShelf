@@ -24,17 +24,31 @@ actor BookAPIService {
             }
         }
 
-        // Strategy 1: If we have both author and title, search combined FIRST (most specific)
+        // Strategy 1: Use precise intitle:/inauthor: operators for best matching
         if let author = author, !author.isEmpty {
+            // Try with both title and author using Google's search operators
             do {
-                let combinedQuery = "\(author) \(query)"
-                let combinedResults = try await GoogleBooksService.shared.searchBooks(query: combinedQuery)
-                if !combinedResults.isEmpty {
-                    print("[BookAPI] Google Books (author+title) found \(combinedResults.count) results")
-                    addResults(combinedResults)
+                let preciseResults = try await GoogleBooksService.shared.searchBooks(title: query, author: author)
+                if !preciseResults.isEmpty {
+                    print("[BookAPI] Google Books (intitle+inauthor) found \(preciseResults.count) results")
+                    addResults(preciseResults)
                 }
             } catch {
-                print("[BookAPI] Google Books (author+title) error: \(error)")
+                print("[BookAPI] Google Books (intitle+inauthor) error: \(error)")
+            }
+
+            // Also try combined query for broader matching
+            if results.count < 5 {
+                do {
+                    let combinedQuery = "\(author) \(query)"
+                    let combinedResults = try await GoogleBooksService.shared.searchBooks(query: combinedQuery)
+                    if !combinedResults.isEmpty {
+                        print("[BookAPI] Google Books (author+title) found \(combinedResults.count) results")
+                        addResults(combinedResults)
+                    }
+                } catch {
+                    print("[BookAPI] Google Books (author+title) error: \(error)")
+                }
             }
 
             // Also try author alone to get more results
@@ -51,8 +65,21 @@ actor BookAPIService {
             }
         }
 
-        // Strategy 2: Try the title/query alone
+        // Strategy 2: Try the title with intitle: operator for precise matching
         if results.count < 5 {
+            do {
+                let titleResults = try await GoogleBooksService.shared.searchBooks(title: query, author: nil)
+                if !titleResults.isEmpty {
+                    print("[BookAPI] Google Books (intitle only) found \(titleResults.count) results")
+                    addResults(titleResults)
+                }
+            } catch {
+                print("[BookAPI] Google Books (intitle only) error: \(error)")
+            }
+        }
+
+        // Strategy 3: Try generic query as broader fallback
+        if results.count < 3 {
             do {
                 let googleResults = try await GoogleBooksService.shared.searchBooks(query: query)
                 if !googleResults.isEmpty {
@@ -88,20 +115,44 @@ actor BookAPIService {
 
     /// Scores results based on how well they match the query and author
     private func scoreAndSortResults(_ results: [BookSearchResult], query: String, author: String?) -> [BookSearchResult] {
-        let queryWords = Set(query.lowercased().components(separatedBy: .whitespaces).filter { $0.count >= 2 })
+        let queryLower = query.lowercased()
+        let queryWords = queryLower.components(separatedBy: .whitespaces).filter { $0.count >= 2 }
+        let queryWordsSet = Set(queryWords)
         let authorWords = author.map { Set($0.lowercased().components(separatedBy: .whitespaces).filter { $0.count >= 2 }) } ?? []
 
         let scored = results.map { result -> (result: BookSearchResult, score: Int) in
             var score = 0
             let titleLower = result.title.lowercased()
-            let titleWords = Set(titleLower.components(separatedBy: .whitespaces))
+            let titleWords = titleLower.components(separatedBy: .whitespaces)
+            let titleWordsSet = Set(titleWords)
+
+            // Strong bonus for title containing the full query (handles "Tomorrow and Tomorrow and Tomorrow")
+            if titleLower.contains(queryLower) {
+                score += 50
+            }
 
             // Score based on title word matches
-            for word in queryWords {
-                if titleWords.contains(word) {
+            for word in queryWordsSet {
+                if titleWordsSet.contains(word) {
                     score += 10 // Exact word match in title
                 } else if titleLower.contains(word) {
                     score += 5 // Partial match in title
+                }
+            }
+
+            // Bonus for matching word count/pattern (helps with repeated word titles)
+            let queryWordCount = queryWords.count
+            let matchingWordCount = queryWords.filter { titleWordsSet.contains($0) }.count
+            if matchingWordCount == queryWordCount {
+                score += 15  // All query words found in title
+            }
+
+            // Bonus for similar word repetition pattern
+            for word in queryWordsSet {
+                let queryOccurrences = queryWords.filter { $0 == word }.count
+                let titleOccurrences = titleWords.filter { $0 == word }.count
+                if queryOccurrences > 1 && titleOccurrences >= queryOccurrences {
+                    score += 10 * queryOccurrences  // Bonus for matching repeated words
                 }
             }
 
@@ -114,7 +165,7 @@ actor BookAPIService {
             }
 
             // Bonus for exact title match
-            if queryWords.isSubset(of: titleWords) {
+            if queryWordsSet.isSubset(of: titleWordsSet) {
                 score += 20
             }
 

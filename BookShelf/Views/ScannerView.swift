@@ -179,11 +179,42 @@ struct ScannerView: View {
                     return
                 }
 
+                // Apply OCR error corrections
+                let correctedText = correctOCRErrors(recognizedText)
+                if correctedText != recognizedText {
+                    print("=== OCR CORRECTED TEXT ===")
+                    print(correctedText)
+                    print("=== END CORRECTED TEXT ===")
+                }
+
                 // Extract title and author from OCR text
-                let extracted = extractTitleAndAuthor(from: recognizedText)
+                let extracted = extractTitleAndAuthor(from: correctedText)
                 print("Extracted - Title: '\(extracted.title ?? "nil")', Author: '\(extracted.author ?? "nil")'")
 
+                // Also try to find potential author names for fallback search
+                let potentialNames = findPotentialAuthorNames(from: correctedText)
+                print("Potential author names found: \(potentialNames)")
+
                 guard let title = extracted.title, !title.isEmpty else {
+                    // Fallback: if we found potential names, search with just those
+                    if !potentialNames.isEmpty {
+                        let authorQuery = potentialNames.joined(separator: " ")
+                        ocrStatus = .searching(authorQuery)
+                        let fallbackResults = try await BookAPIService.shared.smartSearch(
+                            query: authorQuery,
+                            author: nil
+                        )
+                        if !fallbackResults.isEmpty {
+                            viewModel.searchResults = fallbackResults
+                            ocrSearchQuery = authorQuery
+                            ocrStatus = .found(fallbackResults.count)
+                            try? await Task.sleep(for: .seconds(0.5))
+                            showOCRResults = true
+                            ocrStatus = .idle
+                            return
+                        }
+                    }
+
                     ocrStatus = .error("Could not find book information in the image")
                     try? await Task.sleep(for: .seconds(3))
                     ocrStatus = .idle
@@ -194,10 +225,21 @@ struct ScannerView: View {
                 let displayQuery = extracted.author != nil ? "\(title) by \(extracted.author!)" : title
                 ocrStatus = .searching(displayQuery)
 
-                let results = try await BookAPIService.shared.smartSearch(
+                var results = try await BookAPIService.shared.smartSearch(
                     query: title,
                     author: extracted.author
                 )
+
+                // Fallback: if no results and we have potential names, try searching with just the names
+                if results.isEmpty && !potentialNames.isEmpty {
+                    let authorQuery = potentialNames.joined(separator: " ")
+                    print("Fallback search with potential author: '\(authorQuery)'")
+                    ocrStatus = .searching(authorQuery)
+                    results = try await BookAPIService.shared.smartSearch(
+                        query: authorQuery,
+                        author: nil
+                    )
+                }
 
                 if results.isEmpty {
                     ocrStatus = .error("No books found. Try taking a clearer photo.")
@@ -237,13 +279,35 @@ struct ScannerView: View {
                     return
                 }
 
-                // Sort observations by vertical position (top to bottom) then by size (larger first)
-                let sortedObservations = observations.sorted { obs1, obs2 in
+                // Calculate size statistics to filter small text
+                let sizes = observations.map { $0.boundingBox.height }
+                let maxHeight = sizes.max() ?? 0
+                let avgHeight = sizes.isEmpty ? 0 : sizes.reduce(0, +) / CGFloat(sizes.count)
+
+                // Dynamic threshold: keep text that is at least 40% of max height or above average
+                // This filters out small blurbs while keeping title and author
+                let sizeThreshold = max(maxHeight * 0.35, avgHeight * 0.8)
+
+                print("[OCR] Max text height: \(maxHeight), Avg: \(avgHeight), Threshold: \(sizeThreshold)")
+
+                // Filter to keep only larger text (likely title/author)
+                let significantObservations = observations.filter { obs in
+                    let height = obs.boundingBox.height
+                    let isLargeEnough = height >= sizeThreshold
+
+                    if let text = obs.topCandidates(1).first?.string {
+                        print("[OCR] '\(text)' - height: \(String(format: "%.3f", height)) - \(isLargeEnough ? "KEEP" : "skip")")
+                    }
+
+                    return isLargeEnough
+                }
+
+                // Sort by vertical position (top to bottom) then by size (larger first)
+                let sortedObservations = significantObservations.sorted { obs1, obs2 in
                     let y1 = 1 - obs1.boundingBox.midY
                     let y2 = 1 - obs2.boundingBox.midY
                     if abs(y1 - y2) < 0.05 {
-                        return obs1.boundingBox.width * obs1.boundingBox.height >
-                               obs2.boundingBox.width * obs2.boundingBox.height
+                        return obs1.boundingBox.height > obs2.boundingBox.height
                     }
                     return y1 < y2
                 }
@@ -436,27 +500,194 @@ struct ScannerView: View {
         guard !words.isEmpty else { return nil }
 
         // Words to exclude from the query (marketing, common filler)
+        // NOTE: Keep "and" if it appears multiple times (likely part of title like "Tomorrow and Tomorrow")
         let excludeWords = Set([
-            "the", "a", "an", "to", "of", "and", "or", "in", "on", "by", "for",
+            "the", "a", "an", "to", "of", "or", "in", "on", "by", "for",
             "taut", "tight", "suspenseful", "spellbinding", "witty", "wonderful",
             "mesmerizing", "globe", "boston"
         ])
 
+        // Check if "and" appears multiple times - if so, it's likely part of the title
+        let andCount = words.filter { $0.lowercased() == "and" }.count
+        let keepAnd = andCount >= 2
+
         // Filter to significant words only
         let significantWords = words.filter { word in
             let lower = word.lowercased()
+            if lower == "and" && keepAnd {
+                return true  // Keep "and" if it appears multiple times
+            }
             return !excludeWords.contains(lower)
         }
 
-        // Take the most significant words (up to 5)
-        let queryWords = Array(significantWords.prefix(5))
+        // Take the most significant words (up to 8 for longer titles)
+        let queryWords = Array(significantWords.prefix(8))
 
         if queryWords.isEmpty {
             // Fallback to original words if all were filtered
-            return words.prefix(4).joined(separator: " ")
+            return words.prefix(6).joined(separator: " ")
         }
 
         return queryWords.joined(separator: " ")
+    }
+
+    /// Corrects common OCR misreadings
+    private func correctOCRErrors(_ text: String) -> String {
+        var corrected = text
+
+        // Common OCR character substitutions for author names
+        let charCorrections: [(String, String)] = [
+            // Gabrielle Zevin variations
+            ("CABRIELLE", "GABRIELLE"),   // C misread as G
+            ("GABRJELLE", "GABRIELLE"),   // J misread as I
+            ("GABR1ELLE", "GABRIELLE"),   // 1 misread as I
+            ("CABR1ELLE", "GABRIELLE"),   // C and 1 misread
+            ("ZEV1N", "ZEVIN"),            // 1 misread as I
+            ("2EVIN", "ZEVIN"),            // 2 misread as Z
+            ("MINAZ", "ZEVIN"),            // Complete misread - stylized font
+            ("ZEWIN", "ZEVIN"),            // W misread as V
+            ("ZEVJN", "ZEVIN"),            // J misread as I
+
+            // Common OCR mistakes
+            ("RÉST", "BEST"),              // B misread as R
+            ("8EST", "BEST"),              // 8 misread as B
+            ("AUTH0R", "AUTHOR"),          // 0 misread as O
+            ("N0VEL", "NOVEL"),            // 0 misread as O
+        ]
+
+        for (wrong, right) in charCorrections {
+            corrected = corrected.replacingOccurrences(
+                of: wrong,
+                with: right,
+                options: .caseInsensitive
+            )
+        }
+
+        return corrected
+    }
+
+    /// Checks if a word looks like a potential name (relaxed matching for OCR errors)
+    private func looksLikePotentialName(_ text: String) -> Bool {
+        let cleaned = text.trimmingCharacters(in: .whitespaces)
+        guard cleaned.count >= 4 else { return false }
+
+        // Must be mostly letters (allow 1 number for OCR errors like "ZEV1N")
+        let letterCount = cleaned.filter { $0.isLetter }.count
+        let ratio = Double(letterCount) / Double(cleaned.count)
+        guard ratio >= 0.8 else { return false }
+
+        // Not a common non-name word
+        let notNameWords = Set([
+            "the", "and", "for", "not", "art", "new", "old", "stories", "essays",
+            "novel", "tales", "memoir", "national", "international", "bestseller",
+            "author", "best-sens", "bestselling"
+        ])
+
+        return !notNameWords.contains(cleaned.lowercased())
+    }
+
+    /// Finds potential author names from OCR text for fallback searching
+    private func findPotentialAuthorNames(from text: String) -> [String] {
+        let lines = text.components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { !$0.isEmpty }
+
+        var potentialNames: [String] = []
+        var fullNameCandidates: [(name: String, score: Int)] = []
+
+        // Words that are definitely not names (expanded list)
+        let excludeWords = Set([
+            "and", "the", "a", "an", "of", "or", "by", "for", "to", "in", "on",
+            "novel", "author", "bestseller", "bestselling", "best-sens", "times",
+            "new", "york", "national", "international", "best", "seller",
+            // Common title words
+            "between", "kingdoms", "two", "three", "four", "five", "before", "after",
+            "under", "over", "within", "without", "beyond", "life", "death", "love",
+            "time", "world", "year", "years", "memoir", "story", "book", "books",
+            "notable", "interrupted", "follow", "immersed", "ride", "whole", "anywhere",
+            "review", "one", "was", "would", "chanel", "miller"
+        ])
+
+        // First pass: look for lines that look like "FIRSTNAME LASTNAME" (full author names)
+        for line in lines {
+            let cleaned = line.trimmingCharacters(in: .punctuationCharacters)
+                .trimmingCharacters(in: .whitespaces)
+            let words = cleaned.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
+
+            // Author names are typically 2-3 words
+            if words.count >= 2 && words.count <= 3 {
+                let allLookLikeNames = words.allSatisfy { word in
+                    let lower = word.lowercased()
+                    if excludeWords.contains(lower) { return false }
+                    if word.count < 3 { return false }
+                    if !word.allSatisfy({ $0.isLetter }) { return false }
+                    return true
+                }
+
+                if allLookLikeNames {
+                    // Score based on characteristics
+                    var score = 10
+                    // Bonus for all caps (common for author names on covers)
+                    if cleaned == cleaned.uppercased() { score += 5 }
+                    // Bonus for 2 words (most common author name format)
+                    if words.count == 2 { score += 3 }
+
+                    fullNameCandidates.append((name: cleaned, score: score))
+                }
+            }
+        }
+
+        // Sort by score and take the best full name candidate
+        fullNameCandidates.sort { $0.score > $1.score }
+        if let bestCandidate = fullNameCandidates.first {
+            let words = bestCandidate.name.components(separatedBy: .whitespaces)
+            for word in words {
+                let corrected = correctOCRErrors(word)
+                let normalized = corrected.prefix(1).uppercased() + corrected.dropFirst().lowercased()
+                potentialNames.append(normalized)
+            }
+            return potentialNames
+        }
+
+        // Fallback: look for individual name-like words
+        for line in lines {
+            let words = line.components(separatedBy: .whitespaces)
+                .map { $0.trimmingCharacters(in: .punctuationCharacters) }
+                .filter { !$0.isEmpty }
+
+            for word in words {
+                let cleaned = word.trimmingCharacters(in: .punctuationCharacters)
+                let lower = cleaned.lowercased()
+
+                // Skip excluded words
+                if excludeWords.contains(lower) { continue }
+
+                // Skip short words or numbers
+                if cleaned.count < 4 { continue }
+                if cleaned.allSatisfy({ $0.isNumber }) { continue }
+
+                // Check if it looks like a name (starts with capital, mostly letters)
+                let letterCount = cleaned.filter { $0.isLetter }.count
+                if letterCount < cleaned.count - 1 { continue }
+
+                // Must start with uppercase
+                guard let first = cleaned.first, first.isUppercase else { continue }
+
+                // Apply OCR corrections
+                let corrected = correctOCRErrors(cleaned)
+
+                // Add if it looks like a name
+                if corrected.count >= 4 && corrected.first?.isUppercase == true {
+                    let normalized = corrected.prefix(1).uppercased() + corrected.dropFirst().lowercased()
+                    if !potentialNames.contains(normalized) {
+                        potentialNames.append(normalized)
+                    }
+                }
+            }
+        }
+
+        // Limit to top 2 most likely names
+        return Array(potentialNames.prefix(2))
     }
 
     /// Checks if a string looks like a single name part (first or last name alone)
@@ -476,14 +707,24 @@ struct ScannerView: View {
         // Must be at least 3 characters (to avoid "A", "OF", etc.)
         guard word.count >= 3 else { return false }
 
-        // Should be ALL CAPS (common for author names on covers)
-        guard word == word.uppercased() else { return false }
+        // Accept ALL CAPS or Title Case (relaxed for OCR that detects mixed case)
+        let isAllCaps = word == word.uppercased()
+        let isTitleCase = word.first?.isUppercase == true && word.count >= 4
+        guard isAllCaps || isTitleCase else { return false }
 
-        // Not a common non-name word
+        // Not a common non-name word (includes common title words)
         let notNameWords = Set([
             "the", "and", "for", "not", "art", "new", "old", "stories", "essays",
             "novel", "tales", "memoir", "national", "international", "bestseller",
-            "first", "person", "singular", "plural", "mesmerizing"
+            "first", "person", "singular", "plural", "mesmerizing", "author",
+            // Common title words that get OCR'd as separate lines
+            "between", "kingdoms", "two", "three", "four", "five", "before", "after",
+            "under", "over", "within", "without", "beyond", "behind", "above", "below",
+            "through", "across", "against", "toward", "towards", "into", "onto",
+            "life", "death", "love", "time", "world", "year", "years", "day", "days",
+            "night", "nights", "home", "house", "road", "way", "place", "story",
+            "book", "books", "notable", "interrupted", "follow", "immersed", "ride",
+            "whole", "anywhere", "review", "one", "chanel", "miller"
         ])
 
         return !notNameWords.contains(word.lowercased())
@@ -499,7 +740,8 @@ struct ScannerView: View {
         // Phrases that are definitely NOT author names (check full text)
         let notAuthorPhrases = Set([
             "national bestseller", "international bestseller", "new york times",
-            "best seller", "bestseller", "first person", "stories essays"
+            "best seller", "bestseller", "first person", "stories essays",
+            "kingdoms between", "between kingdoms", "between two", "two kingdoms"
         ])
 
         if notAuthorPhrases.contains(text.lowercased()) {
@@ -512,7 +754,13 @@ struct ScannerView: View {
             "art", "not", "giving", "subtle", "stories", "novel", "tales", "essays",
             "memoir", "life", "death", "love", "time", "world", "new", "old", "last",
             "first", "second", "third", "person", "singular", "plural", "f*ck", "fick",
-            "national", "international", "bestseller", "bestselling", "best", "seller"
+            "national", "international", "bestseller", "bestselling", "best", "seller",
+            // Common title words
+            "between", "kingdoms", "two", "three", "four", "five", "before", "after",
+            "under", "over", "within", "without", "beyond", "behind", "above", "below",
+            "through", "across", "against", "toward", "towards", "into", "onto",
+            "year", "years", "day", "days", "night", "nights", "home", "house",
+            "road", "way", "place", "story", "book", "books", "notable", "review"
         ])
 
         // Check if this looks like a name
