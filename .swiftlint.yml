@@ -1,0 +1,38 @@
+disabled_rules:
+  - trailing_whitespace
+  - line_length
+  - identifier_name
+  - type_body_length
+  - file_length
+  - function_body_length
+
+opt_in_rules:
+  - empty_count
+  - closure_spacing
+  - contains_over_first_not_nil
+  - discouraged_object_literal
+  - empty_string
+  - first_where
+  - implicit_return
+  - modifier_order
+  - overridden_super_call
+  - private_action
+  - private_outlet
+  - redundant_nil_coalescing
+  - sorted_first_last
+  - toggle_bool
+  - unused_import
+  - vertical_whitespace_closing_braces
+
+excluded:
+  - Pods
+  - .build
+  - DerivedData
+
+force_cast: warning
+force_try: warning
+
+nesting:
+  type_level: 2
+
+reporter: xcode
