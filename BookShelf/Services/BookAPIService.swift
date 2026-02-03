@@ -7,6 +7,7 @@ actor BookAPIService {
 
     // MARK: - Unified Search (Google Books primary, Open Library fallback)
 
+    // swiftlint:disable cyclomatic_complexity
     /// Smart search that tries Google Books first, then falls back to Open Library
     /// Results are scored and sorted by relevance to the query
     func smartSearch(query: String, author: String? = nil) async throws -> [BookSearchResult] {
@@ -83,6 +84,7 @@ actor BookAPIService {
         print("[BookAPI] Total unique results: \(scoredResults.count)")
         return scoredResults
     }
+    // swiftlint:enable cyclomatic_complexity
 
     /// Scores results based on how well they match the query and author
     private func scoreAndSortResults(_ results: [BookSearchResult], query: String, author: String?) -> [BookSearchResult] {
@@ -106,10 +108,8 @@ actor BookAPIService {
             // Bonus for author match
             if !authorWords.isEmpty {
                 let resultAuthorLower = result.authors.joined(separator: " ").lowercased()
-                for word in authorWords {
-                    if resultAuthorLower.contains(word) {
-                        score += 8
-                    }
+                for word in authorWords where resultAuthorLower.contains(word) {
+                    score += 8
                 }
             }
 

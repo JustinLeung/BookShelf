@@ -296,6 +296,7 @@ struct ScannerView: View {
         return nil
     }
 
+    // swiftlint:disable cyclomatic_complexity
     /// Extracts likely title and author from OCR text
     /// Returns a tuple with the best guess for title and author (author may be nil)
     private func extractTitleAndAuthor(from text: String) -> (title: String?, author: String?) {
@@ -356,10 +357,8 @@ struct ScannerView: View {
 
         // Collect all single-word name parts (like "HARUKI", "MURAKAMI")
         var singleNameParts: [(index: Int, name: String)] = []
-        for (index, line) in cleanedLines.enumerated() {
-            if looksLikeSingleNamePart(line) {
-                singleNameParts.append((index: index, name: line))
-            }
+        for (index, line) in cleanedLines.enumerated() where looksLikeSingleNamePart(line) {
+            singleNameParts.append((index: index, name: line))
         }
 
         // Strategy 1: If we have exactly 2 single name parts, combine them (handles non-adjacent too)
@@ -395,13 +394,11 @@ struct ScannerView: View {
 
         // Strategy 3: Look for a line that looks like a full author name (2-3 words)
         if potentialAuthor == nil {
-            for (index, line) in cleanedLines.enumerated() {
-                if looksLikeAuthorName(line) {
-                    potentialAuthor = line
-                    authorLineIndices.insert(index)
-                    print("Detected author: \(line)")
-                    break
-                }
+            for (index, line) in cleanedLines.enumerated() where looksLikeAuthorName(line) {
+                potentialAuthor = line
+                authorLineIndices.insert(index)
+                print("Detected author: \(line)")
+                break
             }
         }
 
@@ -432,6 +429,7 @@ struct ScannerView: View {
 
         return (title: title, author: potentialAuthor)
     }
+    // swiftlint:enable cyclomatic_complexity
 
     /// Builds a search query from collected words
     private func buildSearchQuery(from words: [String]) -> String? {
@@ -1017,6 +1015,7 @@ struct CameraPreviewView: UIViewRepresentable {
         }
 
         var previewLayer: AVCaptureVideoPreviewLayer {
+            // swiftlint:disable:next force_cast
             layer as! AVCaptureVideoPreviewLayer
         }
 
