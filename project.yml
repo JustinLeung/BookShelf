@@ -42,3 +42,17 @@ targets:
           else
             echo "warning: SwiftLint not installed, download from https://github.com/realm/SwiftLint"
           fi
+  BookShelfTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - BookShelfTests
+    dependencies:
+      - target: BookShelf
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.justinleung.bookshelf.tests
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: 1
+        DEVELOPMENT_TEAM: ""
+        CODE_SIGN_STYLE: Automatic
