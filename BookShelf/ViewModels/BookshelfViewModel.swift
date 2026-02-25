@@ -126,7 +126,11 @@ class BookshelfViewModel {
     func toggleReadStatus(_ book: Book) {
         guard let modelContext else { return }
 
-        book.readStatus = book.readStatus == .wantToRead ? .read : .wantToRead
+        let newStatus: ReadStatus = book.readStatus == .wantToRead ? .read : .wantToRead
+        book.readStatus = newStatus
+        if newStatus == .wantToRead {
+            book.rating = nil
+        }
 
         do {
             try modelContext.save()
@@ -140,12 +144,33 @@ class BookshelfViewModel {
         guard let modelContext else { return }
 
         book.readStatus = status
+        if status == .wantToRead {
+            book.rating = nil
+        }
 
         do {
             try modelContext.save()
             fetchBooks()
         } catch {
             showError(message: "Failed to update book: \(error.localizedDescription)")
+        }
+    }
+
+    func setRating(_ book: Book, rating: Int?) {
+        guard let modelContext else { return }
+        guard book.readStatus == .read else { return }
+
+        if let rating {
+            book.rating = max(1, min(5, rating))
+        } else {
+            book.rating = nil
+        }
+
+        do {
+            try modelContext.save()
+            fetchBooks()
+        } catch {
+            showError(message: "Failed to update rating: \(error.localizedDescription)")
         }
     }
 

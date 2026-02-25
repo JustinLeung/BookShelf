@@ -49,6 +49,22 @@ struct BookDetailView: View {
                     }
                     .padding(.horizontal)
 
+                    // Star Rating (only for read books)
+                    if book.readStatus == .read {
+                        VStack(spacing: 4) {
+                            Text("Your Rating")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                            StarRatingView(
+                                rating: book.rating,
+                                interactive: true,
+                                starSize: 32
+                            ) { newRating in
+                                viewModel.setRating(book, rating: newRating)
+                            }
+                        }
+                    }
+
                     // Purchase Buttons
                     VStack(spacing: 12) {
                         if let amazonURL = book.amazonURL {
@@ -107,6 +123,10 @@ struct BookDetailView: View {
 
                                 if let pageCount = book.pageCount {
                                     DetailRow(label: "Pages", value: "\(pageCount)")
+                                }
+
+                                if let _ = book.rating {
+                                    DetailRow(label: "Rating", value: book.ratingDisplay)
                                 }
 
                                 DetailRow(label: "Added", value: book.dateAdded.formatted(date: .abbreviated, time: .omitted))

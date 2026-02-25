@@ -21,6 +21,7 @@
 		E795C2CBB906E037082B6CE3 /* Book.swift in Sources */ = {isa = PBXBuildFile; fileRef = DBE9138FF989E30EC42D785E /* Book.swift */; };
 		EC4557EE6972AA44BBC3DB14 /* GoogleBooksService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFD8A6170232E155BD6117D /* GoogleBooksService.swift */; };
 		FF604C674FC4BA6FE8769BE5 /* BookShelfTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8C7DE30EAA16B8622358C01 /* BookShelfTests.swift */; };
+		AB12CD34EF56789012345678 /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB12CD34EF56789012345679 /* StarRatingView.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -51,6 +52,7 @@
 		DD5E704D6CD36193C174F23C /* ImageCacheService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheService.swift; sourceTree = "<group>"; };
 		F505296BBDC9587F1A98A418 /* BookDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookDetailView.swift; sourceTree = "<group>"; };
 		FEE4D5731C59D11D80ED2C2A /* ScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScannerView.swift; sourceTree = "<group>"; };
+		AB12CD34EF56789012345679 /* StarRatingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -129,6 +131,7 @@
 				1440732A0F5F6E7EF910163B /* BookshelfView.swift */,
 				C8C4E0D927C15C6835134DB9 /* ManualSearchView.swift */,
 				FEE4D5731C59D11D80ED2C2A /* ScannerView.swift */,
+				AB12CD34EF56789012345679 /* StarRatingView.swift */,
 			);
 			path = Views;
 			sourceTree = "<group>";
@@ -270,6 +273,7 @@
 				6952B304E87F4245A083298D /* ImageCacheService.swift in Sources */,
 				732D9B03C9CCA36993412D9F /* ManualSearchView.swift in Sources */,
 				247D4D1D38CF306C346A3DF5 /* ScannerView.swift in Sources */,
+				AB12CD34EF56789012345678 /* StarRatingView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

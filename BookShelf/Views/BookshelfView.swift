@@ -174,6 +174,14 @@ struct BookGridItem: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+
+                if book.readStatus == .read, book.rating != nil {
+                    StarRatingView(
+                        rating: book.rating,
+                        interactive: false,
+                        starSize: 10
+                    )
+                }
             }
         }
         .frame(maxWidth: .infinity)

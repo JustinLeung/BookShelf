@@ -25,6 +25,7 @@ final class Book {
     @Attribute(.externalStorage) var coverImageData: Data?
     var dateAdded: Date
     var readStatusRaw: String = ReadStatus.wantToRead.rawValue
+    var rating: Int?
 
     var readStatus: ReadStatus {
         get { ReadStatus(rawValue: readStatusRaw) ?? .wantToRead }
@@ -41,7 +42,8 @@ final class Book {
         bookDescription: String? = nil,
         coverImageData: Data? = nil,
         dateAdded: Date = Date(),
-        readStatus: ReadStatus = .wantToRead
+        readStatus: ReadStatus = .wantToRead,
+        rating: Int? = nil
     ) {
         self.isbn = isbn
         self.title = title
@@ -53,6 +55,12 @@ final class Book {
         self.coverImageData = coverImageData
         self.dateAdded = dateAdded
         self.readStatusRaw = readStatus.rawValue
+        self.rating = rating
+    }
+
+    var ratingDisplay: String {
+        guard let rating else { return "" }
+        return String(repeating: "★", count: rating) + String(repeating: "☆", count: 5 - rating)
     }
 
     var authorsDisplay: String {

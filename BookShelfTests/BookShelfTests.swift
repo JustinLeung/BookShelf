@@ -62,6 +62,63 @@ struct BookTests {
     }
 }
 
+// MARK: - Book Rating Tests
+
+@Suite("BookRating")
+struct BookRatingTests {
+    @Test("rating defaults to nil")
+    func defaultRating() {
+        let book = Book(isbn: "1234567890", title: "Test")
+        #expect(book.rating == nil)
+    }
+
+    @Test("init accepts a rating value")
+    func initWithRating() {
+        let book = Book(isbn: "1234567890", title: "Test", rating: 4)
+        #expect(book.rating == 4)
+    }
+
+    @Test("rating can be set within valid range 1-5")
+    func validRange() {
+        let book = Book(isbn: "1234567890", title: "Test")
+        for value in 1...5 {
+            book.rating = value
+            #expect(book.rating == value)
+        }
+    }
+
+    @Test("rating can be set to nil")
+    func nilRating() {
+        let book = Book(isbn: "1234567890", title: "Test", rating: 3)
+        book.rating = nil
+        #expect(book.rating == nil)
+    }
+
+    @Test("ratingDisplay returns star string for rated books")
+    func ratingDisplayWithRating() {
+        let book = Book(isbn: "1234567890", title: "Test", rating: 3)
+        #expect(book.ratingDisplay == "★★★☆☆")
+    }
+
+    @Test("ratingDisplay returns empty string for unrated books")
+    func ratingDisplayWithoutRating() {
+        let book = Book(isbn: "1234567890", title: "Test")
+        #expect(book.ratingDisplay == "")
+    }
+
+    @Test("ratingDisplay shows all stars filled for rating of 5")
+    func ratingDisplayFiveStars() {
+        let book = Book(isbn: "1234567890", title: "Test", rating: 5)
+        #expect(book.ratingDisplay == "★★★★★")
+    }
+
+    @Test("ratingDisplay shows one star filled for rating of 1")
+    func ratingDisplayOneStar() {
+        let book = Book(isbn: "1234567890", title: "Test", rating: 1)
+        #expect(book.ratingDisplay == "★☆☆☆☆")
+    }
+}
+
 // MARK: - BookSearchResult Tests
 
 @Suite("BookSearchResult")
