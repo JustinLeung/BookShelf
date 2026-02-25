@@ -13,6 +13,10 @@ struct BookshelfView: View {
         GridItem(.adaptive(minimum: 120, maximum: 160), spacing: 16)
     ]
 
+    private var currentlyReadingBooks: [Book] {
+        viewModel.books.filter { $0.readStatus == .currentlyReading }
+    }
+
     private var wantToReadBooks: [Book] {
         viewModel.books.filter { $0.readStatus == .wantToRead }
     }
@@ -63,6 +67,11 @@ struct BookshelfView: View {
     private var booksListView: some View {
         ScrollView {
             VStack(spacing: 24) {
+                // Currently Reading section (shown first, most prominent)
+                if !currentlyReadingBooks.isEmpty {
+                    bookSection(title: "Currently Reading", books: currentlyReadingBooks)
+                }
+
                 // Want to Read section
                 if !wantToReadBooks.isEmpty {
                     bookSection(title: "Want to Read", books: wantToReadBooks)
@@ -110,14 +119,12 @@ struct BookshelfView: View {
                                 Label("View Details", systemImage: "info.circle")
                             }
 
-                            // Toggle read status
-                            Button {
-                                viewModel.toggleReadStatus(book)
-                            } label: {
-                                if book.readStatus == .wantToRead {
-                                    Label("Mark as Read", systemImage: "checkmark.circle")
-                                } else {
-                                    Label("Mark as Want to Read", systemImage: "bookmark")
+                            // Show status options the book is NOT currently in
+                            ForEach(ReadStatus.allCases.filter { $0 != book.readStatus }, id: \.self) { status in
+                                Button {
+                                    viewModel.setReadStatus(book, status: status)
+                                } label: {
+                                    Label(status.displayName, systemImage: status.icon)
                                 }
                             }
 

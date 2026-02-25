@@ -34,7 +34,7 @@ struct BookDetailView: View {
                                 viewModel.setReadStatus(book, status: status)
                             } label: {
                                 HStack {
-                                    Image(systemName: status == .read ? "checkmark.circle.fill" : "bookmark.fill")
+                                    Image(systemName: status.icon)
                                     Text(status.displayName)
                                 }
                                 .font(.subheadline)
@@ -127,6 +127,18 @@ struct BookDetailView: View {
 
                                 if let _ = book.rating {
                                     DetailRow(label: "Rating", value: book.ratingDisplay)
+                                }
+
+                                if let dateStarted = book.dateStarted {
+                                    DetailRow(label: "Started", value: dateStarted.formatted(date: .abbreviated, time: .omitted))
+                                }
+
+                                if let dateFinished = book.dateFinished {
+                                    DetailRow(label: "Finished", value: dateFinished.formatted(date: .abbreviated, time: .omitted))
+                                }
+
+                                if let days = book.daysToRead {
+                                    DetailRow(label: "Days to Read", value: "\(days) days")
                                 }
 
                                 DetailRow(label: "Added", value: book.dateAdded.formatted(date: .abbreviated, time: .omitted))

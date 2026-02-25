@@ -124,11 +124,41 @@ class BookshelfViewModel {
     }
 
     func toggleReadStatus(_ book: Book) {
+        let newStatus: ReadStatus
+        switch book.readStatus {
+        case .wantToRead: newStatus = .currentlyReading
+        case .currentlyReading: newStatus = .read
+        case .read: newStatus = .wantToRead
+        }
+        setReadStatus(book, status: newStatus)
+    }
+
+    func setReadStatus(_ book: Book, status: ReadStatus) {
         guard let modelContext else { return }
 
-        let newStatus: ReadStatus = book.readStatus == .wantToRead ? .read : .wantToRead
-        book.readStatus = newStatus
-        if newStatus == .wantToRead {
+        book.readStatus = status
+
+        // Auto-set dates on status transitions
+        switch status {
+        case .currentlyReading:
+            if book.dateStarted == nil {
+                book.dateStarted = Date()
+            }
+            book.dateFinished = nil
+        case .read:
+            if book.dateStarted == nil {
+                book.dateStarted = Date()
+            }
+            if book.dateFinished == nil {
+                book.dateFinished = Date()
+            }
+        case .wantToRead:
+            book.dateStarted = nil
+            book.dateFinished = nil
+        }
+
+        // Clear rating when not "read"
+        if status != .read {
             book.rating = nil
         }
 
@@ -140,19 +170,25 @@ class BookshelfViewModel {
         }
     }
 
-    func setReadStatus(_ book: Book, status: ReadStatus) {
+    func updateDateStarted(_ book: Book, date: Date?) {
         guard let modelContext else { return }
-
-        book.readStatus = status
-        if status == .wantToRead {
-            book.rating = nil
-        }
-
+        book.dateStarted = date
         do {
             try modelContext.save()
             fetchBooks()
         } catch {
-            showError(message: "Failed to update book: \(error.localizedDescription)")
+            showError(message: "Failed to update date: \(error.localizedDescription)")
+        }
+    }
+
+    func updateDateFinished(_ book: Book, date: Date?) {
+        guard let modelContext else { return }
+        book.dateFinished = date
+        do {
+            try modelContext.save()
+            fetchBooks()
+        } catch {
+            showError(message: "Failed to update date: \(error.localizedDescription)")
         }
     }
 

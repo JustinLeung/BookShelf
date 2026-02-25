@@ -3,12 +3,22 @@ import SwiftData
 
 enum ReadStatus: String, Codable, CaseIterable {
     case wantToRead = "want_to_read"
+    case currentlyReading = "currently_reading"
     case read = "read"
 
     var displayName: String {
         switch self {
         case .wantToRead: return "Want to Read"
+        case .currentlyReading: return "Currently Reading"
         case .read: return "Read"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .wantToRead: return "bookmark.fill"
+        case .currentlyReading: return "book.fill"
+        case .read: return "checkmark.circle.fill"
         }
     }
 }
@@ -26,6 +36,8 @@ final class Book {
     var dateAdded: Date
     var readStatusRaw: String = ReadStatus.wantToRead.rawValue
     var rating: Int?
+    var dateStarted: Date?
+    var dateFinished: Date?
 
     var readStatus: ReadStatus {
         get { ReadStatus(rawValue: readStatusRaw) ?? .wantToRead }
@@ -43,7 +55,9 @@ final class Book {
         coverImageData: Data? = nil,
         dateAdded: Date = Date(),
         readStatus: ReadStatus = .wantToRead,
-        rating: Int? = nil
+        rating: Int? = nil,
+        dateStarted: Date? = nil,
+        dateFinished: Date? = nil
     ) {
         self.isbn = isbn
         self.title = title
@@ -56,6 +70,13 @@ final class Book {
         self.dateAdded = dateAdded
         self.readStatusRaw = readStatus.rawValue
         self.rating = rating
+        self.dateStarted = dateStarted
+        self.dateFinished = dateFinished
+    }
+
+    var daysToRead: Int? {
+        guard let start = dateStarted, let finish = dateFinished else { return nil }
+        return Calendar.current.dateComponents([.day], from: start, to: finish).day
     }
 
     var ratingDisplay: String {
