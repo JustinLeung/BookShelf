@@ -4,6 +4,7 @@ struct BookDetailView: View {
     let book: Book
     @Bindable var viewModel: BookshelfViewModel
     @Environment(\.dismiss) private var dismiss
+    @State private var showProgressUpdate = false
 
     var body: some View {
         NavigationStack {
@@ -48,6 +49,49 @@ struct BookDetailView: View {
                         }
                     }
                     .padding(.horizontal)
+
+                    // Reading Progress (only for currently reading)
+                    if book.readStatus == .currentlyReading {
+                        VStack(spacing: 12) {
+                            if let progress = book.calculatedProgress {
+                                HStack {
+                                    if let page = book.currentPage, let total = book.pageCount {
+                                        Text("Page \(page) of \(total)")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text("\(Int(progress * 100))%")
+                                        .font(.subheadline)
+                                        .fontWeight(.medium)
+                                        .foregroundStyle(.secondary)
+                                }
+
+                                ReadingProgressBar(progress: progress, height: 8)
+                            }
+
+                            Button {
+                                showProgressUpdate = true
+                            } label: {
+                                HStack {
+                                    Image(systemName: "chart.line.uptrend.xyaxis")
+                                    Text("Update Progress")
+                                }
+                                .font(.subheadline)
+                                .fontWeight(.medium)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .background(Color(.systemGray5))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                            }
+                        }
+                        .padding(.horizontal)
+                        .sheet(isPresented: $showProgressUpdate) {
+                            ProgressUpdateView(book: book) { page, percentage in
+                                viewModel.updateProgress(book, page: page, percentage: percentage)
+                            }
+                        }
+                    }
 
                     // Star Rating (only for read books)
                     if book.readStatus == .read {

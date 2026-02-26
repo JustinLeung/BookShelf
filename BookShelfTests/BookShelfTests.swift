@@ -63,6 +63,162 @@ struct BookTests {
     }
 }
 
+// MARK: - Reading Progress Tests
+
+@Suite("ReadingProgress")
+struct ReadingProgressTests {
+    @Test("calculatedProgress derives from currentPage and pageCount")
+    func calculatedProgressFromPages() {
+        let book = Book(isbn: "1234567890", title: "Test", pageCount: 200, currentPage: 100)
+        #expect(book.calculatedProgress == 0.5)
+    }
+
+    @Test("calculatedProgress falls back to progressPercentage when no pageCount")
+    func calculatedProgressFallback() {
+        let book = Book(isbn: "1234567890", title: "Test", progressPercentage: 0.75)
+        #expect(book.calculatedProgress == 0.75)
+    }
+
+    @Test("calculatedProgress returns nil when no progress data")
+    func calculatedProgressNil() {
+        let book = Book(isbn: "1234567890", title: "Test")
+        #expect(book.calculatedProgress == nil)
+    }
+
+    @Test("calculatedProgress prefers page-based over percentage")
+    func calculatedProgressPrefersPages() {
+        let book = Book(isbn: "1234567890", title: "Test", pageCount: 100, currentPage: 25, progressPercentage: 0.9)
+        #expect(book.calculatedProgress == 0.25)
+    }
+
+    @Test("calculatedProgress clamps to 0.0-1.0 range")
+    func calculatedProgressClamped() {
+        let overBook = Book(isbn: "1234567890", title: "Test", pageCount: 100, currentPage: 150)
+        #expect(overBook.calculatedProgress == 1.0)
+
+        let negativeBook = Book(isbn: "1234567890", title: "Test", progressPercentage: -0.5)
+        #expect(negativeBook.calculatedProgress == 0.0)
+
+        let overPercentage = Book(isbn: "1234567890", title: "Test", progressPercentage: 1.5)
+        #expect(overPercentage.calculatedProgress == 1.0)
+    }
+
+    @Test("calculatedProgress returns nil when pageCount is zero")
+    func calculatedProgressZeroPageCount() {
+        let book = Book(isbn: "1234567890", title: "Test", pageCount: 0, currentPage: 10)
+        #expect(book.calculatedProgress == nil)
+    }
+
+    @Test("currentPage and progressPercentage default to nil")
+    func progressDefaultsToNil() {
+        let book = Book(isbn: "1234567890", title: "Test")
+        #expect(book.currentPage == nil)
+        #expect(book.progressPercentage == nil)
+    }
+
+    @Test("sampleCurrentlyReading has progress data")
+    func sampleCurrentlyReadingProgress() {
+        let book = Book.sampleCurrentlyReading
+        #expect(book.currentPage == 124)
+        #expect(book.calculatedProgress != nil)
+        #expect(book.calculatedProgress! > 0.0)
+        #expect(book.calculatedProgress! < 1.0)
+    }
+}
+
+// MARK: - Reading Progress ViewModel Tests
+
+@Suite("ReadingProgressViewModel")
+struct ReadingProgressViewModelTests {
+    @Test("progress clears when status changes to wantToRead")
+    @MainActor
+    func progressClearsOnWantToRead() throws {
+        let vm = BookshelfViewModel()
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Book.self, configurations: config)
+        let context = container.mainContext
+        let book = Book(isbn: "111", title: "Test", pageCount: 200, readStatus: .currentlyReading, currentPage: 100, progressPercentage: 0.5)
+        context.insert(book)
+        try context.save()
+        vm.setModelContext(context)
+
+        vm.setReadStatus(book, status: .wantToRead)
+
+        #expect(book.currentPage == nil)
+        #expect(book.progressPercentage == nil)
+    }
+
+    @Test("progress set to 100% when status changes to read")
+    @MainActor
+    func progressSetsTo100OnRead() throws {
+        let vm = BookshelfViewModel()
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Book.self, configurations: config)
+        let context = container.mainContext
+        let book = Book(isbn: "111", title: "Test", pageCount: 200, readStatus: .currentlyReading, currentPage: 100)
+        context.insert(book)
+        try context.save()
+        vm.setModelContext(context)
+
+        vm.setReadStatus(book, status: .read)
+
+        #expect(book.currentPage == 200)
+        #expect(book.progressPercentage == 1.0)
+    }
+
+    @Test("updateProgress clamps page to pageCount")
+    @MainActor
+    func updateProgressClampsPage() throws {
+        let vm = BookshelfViewModel()
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Book.self, configurations: config)
+        let context = container.mainContext
+        let book = Book(isbn: "111", title: "Test", pageCount: 200, readStatus: .currentlyReading)
+        context.insert(book)
+        try context.save()
+        vm.setModelContext(context)
+
+        vm.updateProgress(book, page: 300, percentage: nil)
+
+        #expect(book.currentPage == 200)
+    }
+
+    @Test("updateProgress clamps negative page to zero")
+    @MainActor
+    func updateProgressClampsNegativePage() throws {
+        let vm = BookshelfViewModel()
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Book.self, configurations: config)
+        let context = container.mainContext
+        let book = Book(isbn: "111", title: "Test", pageCount: 200, readStatus: .currentlyReading)
+        context.insert(book)
+        try context.save()
+        vm.setModelContext(context)
+
+        vm.updateProgress(book, page: -5, percentage: nil)
+
+        #expect(book.currentPage == 0)
+    }
+
+    @Test("updateProgress sets percentage when no page provided")
+    @MainActor
+    func updateProgressSetsPercentage() throws {
+        let vm = BookshelfViewModel()
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Book.self, configurations: config)
+        let context = container.mainContext
+        let book = Book(isbn: "111", title: "Test", readStatus: .currentlyReading)
+        context.insert(book)
+        try context.save()
+        vm.setModelContext(context)
+
+        vm.updateProgress(book, page: nil, percentage: 0.65)
+
+        #expect(book.progressPercentage == 0.65)
+        #expect(book.currentPage == nil)
+    }
+}
+
 // MARK: - Book Rating Tests
 
 @Suite("BookRating")

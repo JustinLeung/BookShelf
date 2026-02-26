@@ -159,6 +159,20 @@ class BookshelfViewModel {
             book.dateFinished = nil
         }
 
+        // Clear progress when moving to wantToRead
+        if status == .wantToRead {
+            book.currentPage = nil
+            book.progressPercentage = nil
+        }
+
+        // Set progress to 100% when marking as read
+        if status == .read {
+            if let pageCount = book.pageCount, pageCount > 0 {
+                book.currentPage = pageCount
+            }
+            book.progressPercentage = 1.0
+        }
+
         // Clear rating when not "read"
         if status != .read {
             book.rating = nil
@@ -191,6 +205,28 @@ class BookshelfViewModel {
             fetchBooks()
         } catch {
             showError(message: "Failed to update date: \(error.localizedDescription)")
+        }
+    }
+
+    func updateProgress(_ book: Book, page: Int?, percentage: Double?) {
+        guard let modelContext else { return }
+
+        if let page {
+            let clampedPage = max(0, book.pageCount.map { min(page, $0) } ?? page)
+            book.currentPage = clampedPage
+            if let pageCount = book.pageCount, pageCount > 0 {
+                book.progressPercentage = Double(clampedPage) / Double(pageCount)
+            }
+        } else if let percentage {
+            book.progressPercentage = min(1.0, max(0.0, percentage))
+            book.currentPage = nil
+        }
+
+        do {
+            try modelContext.save()
+            fetchBooks()
+        } catch {
+            showError(message: "Failed to update progress: \(error.localizedDescription)")
         }
     }
 

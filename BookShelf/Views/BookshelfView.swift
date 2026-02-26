@@ -167,6 +167,10 @@ struct BookGridItem: View {
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
 
+            if book.readStatus == .currentlyReading, let progress = book.calculatedProgress {
+                ReadingProgressBar(progress: progress, height: 3)
+            }
+
             VStack(spacing: 2) {
                 Text(book.title)
                     .font(.caption)

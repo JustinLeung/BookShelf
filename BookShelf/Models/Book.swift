@@ -38,6 +38,8 @@ final class Book {
     var rating: Int?
     var dateStarted: Date?
     var dateFinished: Date?
+    var currentPage: Int?
+    var progressPercentage: Double?
 
     var readStatus: ReadStatus {
         get { ReadStatus(rawValue: readStatusRaw) ?? .wantToRead }
@@ -57,7 +59,9 @@ final class Book {
         readStatus: ReadStatus = .wantToRead,
         rating: Int? = nil,
         dateStarted: Date? = nil,
-        dateFinished: Date? = nil
+        dateFinished: Date? = nil,
+        currentPage: Int? = nil,
+        progressPercentage: Double? = nil
     ) {
         self.isbn = isbn
         self.title = title
@@ -72,6 +76,18 @@ final class Book {
         self.rating = rating
         self.dateStarted = dateStarted
         self.dateFinished = dateFinished
+        self.currentPage = currentPage
+        self.progressPercentage = progressPercentage
+    }
+
+    var calculatedProgress: Double? {
+        if let currentPage, let pageCount, pageCount > 0 {
+            return min(1.0, max(0.0, Double(currentPage) / Double(pageCount)))
+        }
+        if let progressPercentage {
+            return min(1.0, max(0.0, progressPercentage))
+        }
+        return nil
     }
 
     var daysToRead: Int? {
@@ -125,7 +141,8 @@ extension Book {
             pageCount: 328,
             bookDescription: "Among the seminal texts of the 20th century, Nineteen Eighty-Four is a rare work that grows more haunting as its prophecies are fulfilled.",
             readStatus: .currentlyReading,
-            dateStarted: Calendar.current.date(byAdding: .day, value: -14, to: Date())
+            dateStarted: Calendar.current.date(byAdding: .day, value: -14, to: Date()),
+            currentPage: 124
         )
     }
 
