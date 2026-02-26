@@ -37,6 +37,7 @@ class BookShelfTestCase: XCTestCase {
         title: String = "Test",
         authors: [String] = [],
         pageCount: Int? = nil,
+        coverURLString: String? = nil,
         readStatus: ReadStatus = .wantToRead,
         rating: Int? = nil,
         dateStarted: Date? = nil,
@@ -49,6 +50,7 @@ class BookShelfTestCase: XCTestCase {
             title: title,
             authors: authors,
             pageCount: pageCount,
+            coverURLString: coverURLString,
             readStatus: readStatus,
             rating: rating,
             dateStarted: dateStarted,
@@ -1676,5 +1678,93 @@ final class ReadingInsightsTests: BookShelfTestCase {
         let vm = BookshelfViewModel()
         vm.setModelContext(testContext)
         XCTAssertNil(vm.bestReadingWeek())
+    }
+}
+
+// MARK: - Cover Caching Tests
+
+final class CoverCachingTests: BookShelfTestCase {
+    @MainActor
+    func testCoverURLStringStored() throws {
+        let book = makeBook(isbn: "cover1", coverURLString: "https://example.com/cover.jpg")
+        try testContext.save()
+        XCTAssertEqual(book.coverURLString, "https://example.com/cover.jpg")
+    }
+
+    @MainActor
+    func testCoverURLComputed() throws {
+        let book = makeBook(isbn: "cover2", coverURLString: "https://example.com/cover.jpg")
+        try testContext.save()
+        XCTAssertEqual(book.coverURL, URL(string: "https://example.com/cover.jpg"))
+    }
+
+    @MainActor
+    func testCoverURLNilWhenNoString() throws {
+        let book = makeBook(isbn: "cover3")
+        try testContext.save()
+        XCTAssertNil(book.coverURLString)
+        XCTAssertNil(book.coverURL)
+    }
+
+    @MainActor
+    func testBookSearchResultToBookPreservesCoverURL() {
+        let result = BookSearchResult(
+            isbn: "cover4",
+            title: "Test Book",
+            authors: ["Author"],
+            publisher: nil,
+            publishDate: nil,
+            pageCount: 100,
+            description: nil,
+            coverURL: URL(string: "https://example.com/cover.jpg")
+        )
+        let book = result.toBook()
+        XCTAssertEqual(book.coverURLString, "https://example.com/cover.jpg")
+    }
+
+    @MainActor
+    func testBookSearchResultToBookNilCoverURL() {
+        let result = BookSearchResult(
+            isbn: "cover5",
+            title: "Test Book",
+            authors: [],
+            publisher: nil,
+            publishDate: nil,
+            pageCount: nil,
+            description: nil,
+            coverURL: nil
+        )
+        let book = result.toBook()
+        XCTAssertNil(book.coverURLString)
+    }
+
+    @MainActor
+    func testBackfillIdentifiesBooksWithMissingCovers() throws {
+        let vm = BookshelfViewModel()
+        let _ = makeBook(isbn: "bf1", coverURLString: "https://example.com/c1.jpg")
+        let _ = makeBook(isbn: "bf2")
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        // Both books have nil coverImageData
+        let booksWithoutCovers = vm.books.filter { $0.coverImageData == nil }
+        XCTAssertEqual(booksWithoutCovers.count, 2)
+    }
+
+    @MainActor
+    func testBackfillSkipsBooksWithExistingCovers() throws {
+        let vm = BookshelfViewModel()
+        let book = Book(
+            isbn: "bf3",
+            title: "Has Cover",
+            coverImageData: Data([0xFF, 0xD8]),
+            coverURLString: "https://example.com/c3.jpg"
+        )
+        testContext.insert(book)
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        let booksWithoutCovers = vm.books.filter { $0.coverImageData == nil }
+        XCTAssertEqual(booksWithoutCovers.count, 0)
     }
 }

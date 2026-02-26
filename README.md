@@ -13,7 +13,7 @@ An iOS reading tracker that lets you scan book covers and barcodes to build a pe
 - **Reading List** — Track books as "Want to Read", "Currently Reading", "Read", "Paused", or "Did Not Finish" with on-device persistence via SwiftData
 - **Star Ratings** — Rate books you've read on a 1–5 star scale
 - **Quick Links** — Jump directly to Amazon or Audible to purchase a book
-- **Image Caching** — Two-tier caching system (in-memory + disk) for cover images
+- **Image Caching** — Two-tier caching system (in-memory + disk) for cover images with cache-first add (avoids re-downloading covers already viewed in search) and automatic backfill of missing covers on app launch
 
 ### Tab-Based Navigation
 - **Reading Tab** — Currently Reading dashboard as the primary view with book cards, progress rings, and quick actions
@@ -91,10 +91,46 @@ An iOS reading tracker that lets you scan book covers and barcodes to build a pe
 2. Open `BookShelf.xcodeproj` in Xcode
 3. Build and run on a simulator or device (camera features require a physical device)
 
+## Design System
+
+BookShelf uses a centralized "warm reading nook" theme defined in `BookShelf/Theme/`.
+
+### Colors (light / dark)
+
+| Role | Light | Dark | Hex |
+|------|-------|------|-----|
+| Accent (plum) | RGB(155,89,117) | same | `#9B5975` |
+| Page Background | RGB(250,245,238) | RGB(31,26,23) | `#FAF5EE` / `#1F1A17` |
+| Card Surface | RGB(245,237,227) | RGB(46,38,33) | `#F5EDE3` / `#2E2621` |
+| Progress Track | RGB(230,219,207) | RGB(64,56,51) | `#E6DBCF` / `#403833` |
+| Amber (stars, streaks) | RGB(204,148,51) | same | `#CC9433` |
+| Terracotta (highlight) | RGB(194,110,82) | same | `#C26E52` |
+| Sage (success) | RGB(140,166,128) | same | `#8CA680` |
+| Espresso (deep anchor) | RGB(77,56,46) | same | `#4D382E` |
+
+### Typography
+
+- **Section titles** — New York serif bold (`.system(.title2, design: .serif, weight: .bold)`)
+- **Card titles** — New York serif semibold (`.system(.subheadline, design: .serif, weight: .semibold)`)
+- **Display** — New York serif light at large sizes (timer, hero stats)
+- **Body/Caption** — SF Pro (system default) for readability
+
+### Theme Modifiers
+
+- `.themedCard()` — Replaces inline padding + systemGray6 background + clip with warm card surface + subtle espresso shadow
+- `.themedSectionTitle()` — Applies serif section title font
+
+### Launch Screen
+
+Espresso brown (`#4D382E`) background with warm cream (`#FAF5EE`) icon and New York Bold title.
+
 ## Project Structure
 
 ```
 BookShelf/
+├── Theme/
+│   ├── AppTheme.swift           # Centralized colors, gradients, typography, layout tokens
+│   └── ThemeModifiers.swift     # .themedCard() and .themedSectionTitle() view modifiers
 ├── Models/
 │   ├── Book.swift               # SwiftData model + ReadStatus enum (5 statuses)
 │   ├── ReadingProgressEntry.swift # Reading progress history model

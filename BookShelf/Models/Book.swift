@@ -51,6 +51,12 @@ final class Book {
     var currentPage: Int?
     var progressPercentage: Double?
     var dnfReason: String?
+    var coverURLString: String?
+
+    var coverURL: URL? {
+        guard let coverURLString else { return nil }
+        return URL(string: coverURLString)
+    }
 
     var readStatus: ReadStatus {
         get { ReadStatus(rawValue: readStatusRaw) ?? .wantToRead }
@@ -66,6 +72,7 @@ final class Book {
         pageCount: Int? = nil,
         bookDescription: String? = nil,
         coverImageData: Data? = nil,
+        coverURLString: String? = nil,
         dateAdded: Date = Date(),
         readStatus: ReadStatus = .wantToRead,
         rating: Int? = nil,
@@ -82,6 +89,7 @@ final class Book {
         self.pageCount = pageCount
         self.bookDescription = bookDescription
         self.coverImageData = coverImageData
+        self.coverURLString = coverURLString
         self.dateAdded = dateAdded
         self.readStatusRaw = readStatus.rawValue
         self.rating = rating
@@ -265,7 +273,8 @@ struct BookSearchResult: Identifiable {
             publishDate: publishDate,
             pageCount: pageCount,
             bookDescription: description,
-            coverImageData: coverData
+            coverImageData: coverData,
+            coverURLString: coverURL?.absoluteString
         )
     }
 }

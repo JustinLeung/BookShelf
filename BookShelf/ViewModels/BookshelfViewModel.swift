@@ -18,6 +18,7 @@ class BookshelfViewModel {
         self.modelContext = context
         fetchBooks()
         isInitialized = true
+        Task { await backfillMissingCovers() }
     }
 
     func fetchBooks() {
@@ -82,9 +83,9 @@ class BookshelfViewModel {
             return
         }
 
-        // Fetch cover image
-        var coverData: Data?
-        if let coverURL = result.coverURL {
+        // Check image cache first, then fetch from network if needed
+        var coverData: Data? = await ImageCacheService.shared.getImage(for: result.isbn)
+        if coverData == nil, let coverURL = result.coverURL {
             do {
                 coverData = try await BookAPIService.shared.fetchCoverImage(url: coverURL)
                 if let data = coverData {
@@ -326,6 +327,43 @@ class BookshelfViewModel {
 
     func clearSearch() {
         searchResults = []
+    }
+
+    func backfillMissingCovers() async {
+        guard let modelContext else { return }
+
+        let booksWithoutCovers = books.filter { $0.coverImageData == nil }
+        guard !booksWithoutCovers.isEmpty else { return }
+
+        var didUpdate = false
+        for book in booksWithoutCovers {
+            let coverURL: URL?
+            if let stored = book.coverURL {
+                coverURL = stored
+            } else {
+                let cleanISBN = book.isbn.replacingOccurrences(of: "-", with: "")
+                coverURL = URL(string: "https://covers.openlibrary.org/b/isbn/\(cleanISBN)-L.jpg")
+            }
+
+            guard let url = coverURL else { continue }
+
+            do {
+                let data = try await BookAPIService.shared.fetchCoverImage(url: url)
+                book.coverImageData = data
+                await ImageCacheService.shared.cacheImage(data, for: book.isbn)
+                if book.coverURLString == nil {
+                    book.coverURLString = url.absoluteString
+                }
+                didUpdate = true
+            } catch {
+                // Skip this book, cover still unavailable
+            }
+        }
+
+        if didUpdate {
+            try? modelContext.save()
+            fetchBooks()
+        }
     }
 
     func isBookInShelf(isbn: String) -> Bool {
