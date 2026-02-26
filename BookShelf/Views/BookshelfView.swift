@@ -2,12 +2,12 @@ import SwiftUI
 
 struct BookshelfView: View {
     @Bindable var viewModel: BookshelfViewModel
+    @Bindable var timerViewModel: ReadingTimerViewModel
 
     @State private var selectedBook: Book?
     @State private var showDeleteConfirmation = false
     @State private var bookToDelete: Book?
     @State private var showAddBook = false
-    @State private var showStats = false
 
     private let columns = [
         GridItem(.adaptive(minimum: 120, maximum: 160), spacing: 16)
@@ -25,6 +25,14 @@ struct BookshelfView: View {
         viewModel.books.filter { $0.readStatus == .read }
     }
 
+    private var pausedBooks: [Book] {
+        viewModel.books.filter { $0.readStatus == .paused }
+    }
+
+    private var dnfBooks: [Book] {
+        viewModel.books.filter { $0.readStatus == .didNotFinish }
+    }
+
     var body: some View {
         NavigationStack {
             Group {
@@ -36,9 +44,9 @@ struct BookshelfView: View {
                     booksListView
                 }
             }
-            .navigationTitle("Bookshelf")
+            .navigationTitle("Library")
             .sheet(item: $selectedBook) { book in
-                BookDetailView(book: book, viewModel: viewModel)
+                BookDetailView(book: book, viewModel: viewModel, timerViewModel: timerViewModel)
             }
             .confirmationDialog(
                 "Delete Book",
@@ -70,18 +78,6 @@ struct BookshelfView: View {
             .sheet(isPresented: $showAddBook) {
                 AddBookView(viewModel: viewModel)
             }
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showStats = true
-                    } label: {
-                        Image(systemName: "chart.bar.fill")
-                    }
-                }
-            }
-            .sheet(isPresented: $showStats) {
-                StatsView(viewModel: viewModel)
-            }
         }
     }
 
@@ -110,21 +106,25 @@ struct BookshelfView: View {
         ScrollView {
             VStack(spacing: 24) {
                 StatsSummaryCard(viewModel: viewModel)
-                    .onTapGesture { showStats = true }
 
-                // Currently Reading section (shown first, most prominent)
                 if !currentlyReadingBooks.isEmpty {
                     bookSection(title: "Reading", books: currentlyReadingBooks)
                 }
 
-                // Want to Read section
                 if !wantToReadBooks.isEmpty {
                     bookSection(title: "Want to Read", books: wantToReadBooks)
                 }
 
-                // Read section
                 if !readBooks.isEmpty {
                     bookSection(title: "Read", books: readBooks)
+                }
+
+                if !pausedBooks.isEmpty {
+                    bookSection(title: "Paused", books: pausedBooks)
+                }
+
+                if !dnfBooks.isEmpty {
+                    bookSection(title: "Did Not Finish", books: dnfBooks)
                 }
             }
             .padding(.vertical)
@@ -265,12 +265,12 @@ struct BookGridItem: View {
 
 #if DEBUG
 #Preview("Populated Bookshelf") {
-    BookshelfView(viewModel: BookshelfViewModel())
+    BookshelfView(viewModel: BookshelfViewModel(), timerViewModel: ReadingTimerViewModel())
         .modelContainer(Book.previewContainer)
 }
 
 #Preview("Empty Bookshelf") {
-    BookshelfView(viewModel: BookshelfViewModel())
+    BookshelfView(viewModel: BookshelfViewModel(), timerViewModel: ReadingTimerViewModel())
         .modelContainer(for: Book.self, inMemory: true)
 }
 

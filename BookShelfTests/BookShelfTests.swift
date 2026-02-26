@@ -22,6 +22,9 @@ class BookShelfTestCase: XCTestCase {
         try? testContext.delete(model: ReadingProgressEntry.self)
         try? testContext.delete(model: ReadingGoal.self)
         try? testContext.delete(model: ReadingChallenge.self)
+        try? testContext.delete(model: ReadingSession.self)
+        try? testContext.delete(model: BookNote.self)
+        try? testContext.delete(model: StreakFreeze.self)
         try? testContext.delete(model: Book.self)
         try? testContext.save()
         testContext = nil
@@ -1158,5 +1161,520 @@ final class ReadingChallengeTests: BookShelfTestCase {
         let vm = BookshelfViewModel()
         vm.setModelContext(testContext)
         XCTAssertNil(vm.challengeProgress())
+    }
+}
+
+// MARK: - ReadStatus Extended Tests
+
+final class ReadStatusExtendedTests: XCTestCase {
+    func testNewCasesRawValues() {
+        XCTAssertEqual(ReadStatus.paused.rawValue, "paused")
+        XCTAssertEqual(ReadStatus.didNotFinish.rawValue, "did_not_finish")
+    }
+
+    func testNewCasesRoundTrip() {
+        XCTAssertEqual(ReadStatus(rawValue: "paused"), .paused)
+        XCTAssertEqual(ReadStatus(rawValue: "did_not_finish"), .didNotFinish)
+    }
+
+    func testDisplayNames() {
+        XCTAssertEqual(ReadStatus.paused.displayName, "Paused")
+        XCTAssertEqual(ReadStatus.didNotFinish.displayName, "Did Not Finish")
+    }
+
+    func testIcons() {
+        XCTAssertEqual(ReadStatus.paused.icon, "pause.circle.fill")
+        XCTAssertEqual(ReadStatus.didNotFinish.icon, "xmark.circle.fill")
+    }
+
+    func testCountsForChallenge() {
+        XCTAssertTrue(ReadStatus.read.countsForChallenge)
+        XCTAssertFalse(ReadStatus.wantToRead.countsForChallenge)
+        XCTAssertFalse(ReadStatus.currentlyReading.countsForChallenge)
+        XCTAssertFalse(ReadStatus.paused.countsForChallenge)
+        XCTAssertFalse(ReadStatus.didNotFinish.countsForChallenge)
+    }
+
+    func testUnknownRawValueFallsBack() {
+        XCTAssertNil(ReadStatus(rawValue: "unknown_status"))
+    }
+
+    func testAllCasesIncludesNewStatuses() {
+        let allCases = ReadStatus.allCases
+        XCTAssertTrue(allCases.contains(.paused))
+        XCTAssertTrue(allCases.contains(.didNotFinish))
+        XCTAssertEqual(allCases.count, 5)
+    }
+}
+
+// MARK: - Status Transition Tests
+
+final class StatusTransitionTests: BookShelfTestCase {
+    @MainActor
+    func testPausedKeepsProgress() throws {
+        let vm = BookshelfViewModel()
+        let book = makeBook(isbn: "p1", pageCount: 300, readStatus: .currentlyReading,
+                           dateStarted: Date(), currentPage: 150, progressPercentage: 0.5)
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        vm.setReadStatus(book, status: .paused)
+
+        XCTAssertEqual(book.readStatus, .paused)
+        XCTAssertEqual(book.currentPage, 150)
+        XCTAssertNotNil(book.dateStarted)
+        XCTAssertNil(book.dateFinished)
+    }
+
+    @MainActor
+    func testDNFSetsDateFinished() throws {
+        let vm = BookshelfViewModel()
+        let book = makeBook(isbn: "d1", pageCount: 300, readStatus: .currentlyReading,
+                           dateStarted: Date(), currentPage: 100)
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        vm.setReadStatus(book, status: .didNotFinish, dnfReason: "Too boring")
+
+        XCTAssertEqual(book.readStatus, .didNotFinish)
+        XCTAssertNotNil(book.dateFinished)
+        XCTAssertEqual(book.dnfReason, "Too boring")
+        XCTAssertEqual(book.currentPage, 100)
+    }
+
+    @MainActor
+    func testWantToReadClearsDNFReason() throws {
+        let vm = BookshelfViewModel()
+        let book = makeBook(isbn: "w1", pageCount: 300, readStatus: .didNotFinish,
+                           dateStarted: Date(), dateFinished: Date(), currentPage: 50)
+        book.dnfReason = "Lost interest"
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        vm.setReadStatus(book, status: .wantToRead)
+
+        XCTAssertEqual(book.readStatus, .wantToRead)
+        XCTAssertNil(book.dnfReason)
+        XCTAssertNil(book.currentPage)
+        XCTAssertNil(book.dateStarted)
+    }
+
+    @MainActor
+    func testTogglePausedResumesReading() throws {
+        let vm = BookshelfViewModel()
+        let book = makeBook(isbn: "t1", readStatus: .paused)
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        vm.toggleReadStatus(book)
+
+        XCTAssertEqual(book.readStatus, .currentlyReading)
+    }
+
+    @MainActor
+    func testToggleDNFGoesToWantToRead() throws {
+        let vm = BookshelfViewModel()
+        let book = makeBook(isbn: "t2", readStatus: .didNotFinish)
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        vm.toggleReadStatus(book)
+
+        XCTAssertEqual(book.readStatus, .wantToRead)
+    }
+}
+
+// MARK: - ReadingSession Tests
+
+final class ReadingSessionModelTests: BookShelfTestCase {
+    @MainActor
+    func testPagesPerHour() {
+        let session = ReadingSession(
+            bookISBN: "111",
+            startTime: Date(),
+            endTime: Date().addingTimeInterval(3600),
+            duration: 3600,
+            pagesRead: 30
+        )
+        testContext.insert(session)
+        XCTAssertEqual(session.pagesPerHour, 30.0)
+    }
+
+    @MainActor
+    func testPagesPerHourNilWhenNoPagesRead() {
+        let session = ReadingSession(
+            bookISBN: "111",
+            startTime: Date(),
+            endTime: Date().addingTimeInterval(3600),
+            duration: 3600
+        )
+        testContext.insert(session)
+        XCTAssertNil(session.pagesPerHour)
+    }
+
+    @MainActor
+    func testFormattedDurationHours() {
+        let session = ReadingSession(
+            bookISBN: "111",
+            startTime: Date(),
+            endTime: Date(),
+            duration: 3661 // 1h 1m 1s
+        )
+        testContext.insert(session)
+        XCTAssertEqual(session.formattedDuration, "1:01:01")
+    }
+
+    @MainActor
+    func testFormattedDurationMinutes() {
+        let session = ReadingSession(
+            bookISBN: "111",
+            startTime: Date(),
+            endTime: Date(),
+            duration: 125 // 2m 5s
+        )
+        testContext.insert(session)
+        XCTAssertEqual(session.formattedDuration, "2:05")
+    }
+
+    @MainActor
+    func testSessionCRUD() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        let session = ReadingSession(
+            bookISBN: "test-isbn",
+            startTime: Date(),
+            endTime: Date().addingTimeInterval(1800),
+            duration: 1800,
+            pagesRead: 15,
+            startPage: 50,
+            endPage: 65
+        )
+        testContext.insert(session)
+        try testContext.save()
+
+        let sessions = vm.fetchTimedSessions(for: "test-isbn")
+        XCTAssertEqual(sessions.count, 1)
+        XCTAssertEqual(sessions.first?.pagesRead, 15)
+        XCTAssertEqual(sessions.first?.startPage, 50)
+        XCTAssertEqual(sessions.first?.endPage, 65)
+    }
+}
+
+// MARK: - ReadingTimerViewModel Tests
+
+final class ReadingTimerViewModelTests: BookShelfTestCase {
+    @MainActor
+    func testInitialState() {
+        let timer = ReadingTimerViewModel()
+        XCTAssertEqual(timer.state, .idle)
+        XCTAssertNil(timer.currentBook)
+        XCTAssertEqual(timer.displayTime, 0)
+    }
+
+    @MainActor
+    func testStartSession() {
+        let timer = ReadingTimerViewModel()
+        let book = makeBook(isbn: "timer1", readStatus: .currentlyReading)
+
+        timer.startSession(for: book)
+
+        XCTAssertEqual(timer.state, .running)
+        XCTAssertNotNil(timer.currentBook)
+        XCTAssertEqual(timer.currentBook?.isbn, "timer1")
+    }
+
+    @MainActor
+    func testPauseAndResume() {
+        let timer = ReadingTimerViewModel()
+        let book = makeBook(isbn: "timer2", readStatus: .currentlyReading)
+
+        timer.startSession(for: book)
+        XCTAssertEqual(timer.state, .running)
+
+        timer.pause()
+        XCTAssertEqual(timer.state, .paused)
+
+        timer.resume()
+        XCTAssertEqual(timer.state, .running)
+    }
+
+    @MainActor
+    func testCancelSession() {
+        let timer = ReadingTimerViewModel()
+        let book = makeBook(isbn: "timer3", readStatus: .currentlyReading)
+
+        timer.startSession(for: book)
+        timer.cancelSession()
+
+        XCTAssertEqual(timer.state, .idle)
+        XCTAssertNil(timer.currentBook)
+        XCTAssertEqual(timer.displayTime, 0)
+    }
+
+    @MainActor
+    func testEndSessionCreatesReadingSession() throws {
+        let timer = ReadingTimerViewModel()
+        let book = makeBook(isbn: "timer4", pageCount: 300, readStatus: .currentlyReading, currentPage: 50)
+        try testContext.save()
+
+        timer.startSession(for: book)
+        timer.endSession(endPage: 65, modelContext: testContext)
+
+        let descriptor = FetchDescriptor<ReadingSession>(
+            predicate: #Predicate { $0.bookISBN == "timer4" }
+        )
+        let sessions = try testContext.fetch(descriptor)
+        XCTAssertEqual(sessions.count, 1)
+        XCTAssertEqual(sessions.first?.endPage, 65)
+
+        // Book progress should be updated
+        XCTAssertEqual(book.currentPage, 65)
+    }
+
+    @MainActor
+    func testFormattedTime() {
+        let timer = ReadingTimerViewModel()
+        XCTAssertEqual(timer.formattedTime, "00:00:00")
+    }
+}
+
+// MARK: - BookNote Tests
+
+final class BookNoteTests: BookShelfTestCase {
+    @MainActor
+    func testSaveAndFetchNote() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        vm.saveNote(bookISBN: "note1", text: "Great passage", noteType: .quote, pageNumber: 42)
+
+        let notes = vm.fetchNotes(for: "note1")
+        XCTAssertEqual(notes.count, 1)
+        XCTAssertEqual(notes.first?.text, "Great passage")
+        XCTAssertEqual(notes.first?.noteType, .quote)
+        XCTAssertEqual(notes.first?.pageNumber, 42)
+    }
+
+    @MainActor
+    func testFetchAllQuotes() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        vm.saveNote(bookISBN: "q1", text: "Quote 1", noteType: .quote)
+        vm.saveNote(bookISBN: "q1", text: "Note 1", noteType: .note)
+        vm.saveNote(bookISBN: "q2", text: "Quote 2", noteType: .quote)
+
+        let quotes = vm.fetchAllQuotes()
+        XCTAssertEqual(quotes.count, 2)
+    }
+
+    @MainActor
+    func testRandomQuoteReturnsQuote() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        vm.saveNote(bookISBN: "rq1", text: "Random quote text", noteType: .quote)
+
+        let quote = vm.randomQuote()
+        XCTAssertNotNil(quote)
+        XCTAssertEqual(quote?.noteType, .quote)
+    }
+
+    @MainActor
+    func testRandomQuoteNilWhenNoQuotes() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        XCTAssertNil(vm.randomQuote())
+    }
+
+    @MainActor
+    func testDeleteNote() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        vm.saveNote(bookISBN: "del1", text: "To delete", noteType: .note)
+        var notes = vm.fetchNotes(for: "del1")
+        XCTAssertEqual(notes.count, 1)
+
+        vm.deleteNote(notes.first!)
+        notes = vm.fetchNotes(for: "del1")
+        XCTAssertTrue(notes.isEmpty)
+    }
+
+    @MainActor
+    func testNoteTypeGetterSetter() {
+        let note = BookNote(bookISBN: "nt1", text: "Test", noteType: .quote)
+        testContext.insert(note)
+        XCTAssertEqual(note.noteType, .quote)
+
+        note.noteType = .note
+        XCTAssertEqual(note.noteType, .note)
+        XCTAssertEqual(note.noteTypeRaw, "note")
+    }
+}
+
+// MARK: - Streak Freeze Tests
+
+final class StreakFreezeTests: BookShelfTestCase {
+    @MainActor
+    func testUseStreakFreeze() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        XCTAssertTrue(vm.hasStreakFreezeAvailable())
+        let result = vm.useStreakFreeze()
+        XCTAssertTrue(result)
+        XCTAssertFalse(vm.hasStreakFreezeAvailable())
+    }
+
+    @MainActor
+    func testOnePerWeek() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        let first = vm.useStreakFreeze()
+        XCTAssertTrue(first)
+
+        let second = vm.useStreakFreeze()
+        XCTAssertFalse(second)
+    }
+
+    @MainActor
+    func testFreezePreservesStreak() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        let calendar = Calendar.current
+        let now = Date()
+
+        // Create entries for today and 2 days ago (gap yesterday)
+        let todayEntry = ReadingProgressEntry(bookISBN: "sf1", page: 30, timestamp: now)
+        let twoDaysAgoEntry = ReadingProgressEntry(
+            bookISBN: "sf1",
+            page: 20,
+            timestamp: calendar.date(byAdding: .day, value: -2, to: now)!
+        )
+        testContext.insert(todayEntry)
+        testContext.insert(twoDaysAgoEntry)
+
+        // Use a freeze for yesterday
+        let yesterday = calendar.date(byAdding: .day, value: -1, to: now)!
+        let freeze = StreakFreeze(
+            dateUsed: yesterday,
+            weekOfYear: calendar.component(.weekOfYear, from: yesterday),
+            year: calendar.component(.year, from: yesterday)
+        )
+        testContext.insert(freeze)
+        try testContext.save()
+
+        let streak = vm.currentStreak()
+        XCTAssertEqual(streak, 3) // today + freeze yesterday + 2 days ago
+    }
+
+    @MainActor
+    func testFetchFreezeDays() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        let calendar = Calendar.current
+        let now = Date()
+        let freeze = StreakFreeze(
+            dateUsed: now,
+            weekOfYear: calendar.component(.weekOfYear, from: now),
+            year: calendar.component(.year, from: now)
+        )
+        testContext.insert(freeze)
+        try testContext.save()
+
+        let freezeDays = vm.fetchStreakFreezeDays()
+        XCTAssertEqual(freezeDays.count, 1)
+    }
+}
+
+// MARK: - Reading Insights Tests
+
+final class ReadingInsightsTests: BookShelfTestCase {
+    @MainActor
+    func testEstimatedCompletionDate() throws {
+        let vm = BookshelfViewModel()
+        let book = makeBook(isbn: "ins1", pageCount: 300, readStatus: .currentlyReading, currentPage: 150)
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        let calendar = Calendar.current
+        let now = Date()
+        let entry1 = ReadingProgressEntry(
+            bookISBN: "ins1", page: 50,
+            timestamp: calendar.date(byAdding: .day, value: -10, to: now)!
+        )
+        let entry2 = ReadingProgressEntry(
+            bookISBN: "ins1", page: 150,
+            timestamp: now
+        )
+        testContext.insert(entry1)
+        testContext.insert(entry2)
+        try testContext.save()
+
+        let completion = vm.estimatedCompletionDate(for: book)
+        XCTAssertNotNil(completion)
+        // 100 pages in 10 days = 10 pages/day, 150 remaining = 15 days
+        if let date = completion {
+            let daysUntil = calendar.dateComponents([.day], from: now, to: date).day ?? 0
+            XCTAssertEqual(daysUntil, 15)
+        }
+    }
+
+    @MainActor
+    func testEstimatedCompletionNilForFinishedBook() {
+        let book = makeBook(isbn: "ins2", pageCount: 300, readStatus: .read, currentPage: 300)
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        XCTAssertNil(vm.estimatedCompletionDate(for: book))
+    }
+
+    @MainActor
+    func testPagesPerHourFromTimedSessions() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        let session = ReadingSession(
+            bookISBN: "pph1",
+            startTime: Date(),
+            endTime: Date().addingTimeInterval(1800),
+            duration: 1800, // 30 min
+            pagesRead: 20
+        )
+        testContext.insert(session)
+        try testContext.save()
+
+        let pph = vm.pagesPerHour(for: "pph1")
+        XCTAssertNotNil(pph)
+        XCTAssertEqual(pph!, 40.0, accuracy: 0.1) // 20 pages / 0.5 hours
+    }
+
+    @MainActor
+    func testWeeklySummary() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        let summary = vm.weeklySummary()
+        XCTAssertEqual(summary.pages, 0)
+        XCTAssertEqual(summary.books, 0)
+    }
+
+    @MainActor
+    func testPreferredReadingTimeNilWhenNoSessions() {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        XCTAssertNil(vm.preferredReadingTime())
+    }
+
+    @MainActor
+    func testBestReadingWeekNilWhenFewEntries() {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        XCTAssertNil(vm.bestReadingWeek())
     }
 }

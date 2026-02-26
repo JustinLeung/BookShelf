@@ -2,7 +2,6 @@ import SwiftUI
 
 struct StatsView: View {
     @Bindable var viewModel: BookshelfViewModel
-    @Environment(\.dismiss) private var dismiss
     @State private var showGoalSetting = false
     @State private var showChallengeSetup = false
 
@@ -44,12 +43,6 @@ struct StatsView: View {
                 .padding()
             }
             .navigationTitle("Reading Stats")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { dismiss() }
-                }
-            }
             .sheet(isPresented: $showGoalSetting) {
                 GoalSettingView(viewModel: viewModel)
             }

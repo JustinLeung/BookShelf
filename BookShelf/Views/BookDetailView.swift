@@ -3,10 +3,15 @@ import SwiftUI
 struct BookDetailView: View {
     let book: Book
     @Bindable var viewModel: BookshelfViewModel
+    @Bindable var timerViewModel: ReadingTimerViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showProgressUpdate = false
+    @State private var showTimerView = false
+    @State private var showNoteInput = false
+    @State private var showQuoteScanner = false
     @State private var readingSessions: [ReadingProgressEntry] = []
     @State private var readingPace: Double?
+    @State private var notes: [BookNote] = []
 
     enum DetailTab: String, CaseIterable {
         case activity = "Activity"
@@ -14,9 +19,10 @@ struct BookDetailView: View {
     }
     @State private var selectedTab: DetailTab
 
-    init(book: Book, viewModel: BookshelfViewModel, initialTab: DetailTab = .activity) {
+    init(book: Book, viewModel: BookshelfViewModel, timerViewModel: ReadingTimerViewModel, initialTab: DetailTab = .activity) {
         self.book = book
         self.viewModel = viewModel
+        self.timerViewModel = timerViewModel
         self._selectedTab = State(initialValue: initialTab)
     }
     @State private var scrollOffset: CGFloat = 0
@@ -167,11 +173,108 @@ struct BookDetailView: View {
             case .read:
                 ratingSection
                 readingStatsSection
+            case .paused:
+                readingProgressSection
+            case .didNotFinish:
+                if let reason = book.dnfReason, !reason.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Reason")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text(reason)
+                            .font(.subheadline)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
+                }
+                readingStatsSection
             }
+
+            notesSection
 
             Spacer(minLength: 32)
         }
         .padding(.vertical)
+    }
+
+    // MARK: - Notes & Quotes
+
+    private var notesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Notes & Quotes")
+                    .font(.headline)
+                Spacer()
+                Menu {
+                    Button {
+                        showNoteInput = true
+                    } label: {
+                        Label("Add Note", systemImage: "note.text")
+                    }
+                    Button {
+                        showQuoteScanner = true
+                    } label: {
+                        Label("Scan Quote", systemImage: "camera")
+                    }
+                } label: {
+                    Image(systemName: "plus.circle")
+                        .font(.title3)
+                }
+            }
+
+            if notes.isEmpty {
+                Text("No notes or quotes yet")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(notes, id: \.dateCreated) { note in
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Image(systemName: note.noteType == .quote ? "quote.opening" : "note.text")
+                                .font(.caption)
+                                .foregroundStyle(Color.accentColor)
+                            Text(note.noteType == .quote ? "Quote" : "Note")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            Spacer()
+                            if let page = note.pageNumber {
+                                Text("p. \(page)")
+                                    .font(.caption2)
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        Text(note.text)
+                            .font(.subheadline)
+                            .lineLimit(4)
+                            .italic(note.noteType == .quote)
+                    }
+                    .padding()
+                    .background(Color(.systemGray6))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .contextMenu {
+                        Button(role: .destructive) {
+                            viewModel.deleteNote(note)
+                            loadNotes()
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal)
+        .sheet(isPresented: $showNoteInput) {
+            NoteInputView(bookISBN: book.isbn, viewModel: viewModel)
+        }
+        .sheet(isPresented: $showQuoteScanner) {
+            QuoteScannerView(bookISBN: book.isbn, viewModel: viewModel)
+        }
+        .onChange(of: showNoteInput) { _, isPresented in
+            if !isPresented { loadNotes() }
+        }
+        .onChange(of: showQuoteScanner) { _, isPresented in
+            if !isPresented { loadNotes() }
+        }
     }
 
     private var actionButtonsSection: some View {
@@ -194,18 +297,51 @@ struct BookDetailView: View {
                 }
             case .currentlyReading:
                 statusButton(
-                    title: "Update Progress",
-                    icon: "chart.line.uptrend.xyaxis",
+                    title: "Start Timer",
+                    icon: "timer",
                     prominent: true
+                ) {
+                    timerViewModel.startSession(for: book)
+                    showTimerView = true
+                }
+                statusButton(
+                    title: "Quick Update",
+                    icon: "chart.line.uptrend.xyaxis",
+                    prominent: false
                 ) {
                     showProgressUpdate = true
                 }
-                statusButton(
-                    title: "Finished",
-                    icon: "checkmark",
-                    prominent: false
-                ) {
-                    viewModel.setReadStatus(book, status: .read)
+                HStack(spacing: 12) {
+                    Button {
+                        viewModel.setReadStatus(book, status: .read)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "checkmark")
+                            Text("Finished")
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.accentColor.opacity(0.12))
+                        .foregroundStyle(Color.accentColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    Button {
+                        viewModel.setReadStatus(book, status: .paused)
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: "pause")
+                            Text("Pause")
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                        .background(Color.orange.opacity(0.12))
+                        .foregroundStyle(Color.orange)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
                 }
             case .read:
                 statusButton(
@@ -215,9 +351,42 @@ struct BookDetailView: View {
                 ) {
                     viewModel.setReadStatus(book, status: .currentlyReading)
                 }
+            case .paused:
+                statusButton(
+                    title: "Resume Reading",
+                    icon: "play.fill",
+                    prominent: true
+                ) {
+                    viewModel.setReadStatus(book, status: .currentlyReading)
+                }
+                statusButton(
+                    title: "Mark as Did Not Finish",
+                    icon: "xmark",
+                    prominent: false
+                ) {
+                    viewModel.setReadStatus(book, status: .didNotFinish)
+                }
+            case .didNotFinish:
+                statusButton(
+                    title: "Start Over",
+                    icon: "arrow.counterclockwise",
+                    prominent: true
+                ) {
+                    viewModel.setReadStatus(book, status: .wantToRead)
+                }
+                statusButton(
+                    title: "Resume Reading",
+                    icon: "play.fill",
+                    prominent: false
+                ) {
+                    viewModel.setReadStatus(book, status: .currentlyReading)
+                }
             }
         }
         .padding(.horizontal)
+        .sheet(isPresented: $showTimerView) {
+            ReadingTimerView(timerViewModel: timerViewModel, viewModel: viewModel)
+        }
     }
 
     private var readingProgressSection: some View {
@@ -456,6 +625,11 @@ struct BookDetailView: View {
     private func loadSessions() {
         readingSessions = viewModel.fetchReadingSessions(for: book.isbn)
         readingPace = viewModel.readingPace(for: book.isbn)
+        loadNotes()
+    }
+
+    private func loadNotes() {
+        notes = viewModel.fetchNotes(for: book.isbn)
     }
 }
 
@@ -520,19 +694,19 @@ struct DetailRow: View {
 
 #if DEBUG
 #Preview("Want to Read") {
-    BookDetailView(book: .sampleWantToRead, viewModel: BookshelfViewModel())
+    BookDetailView(book: .sampleWantToRead, viewModel: BookshelfViewModel(), timerViewModel: ReadingTimerViewModel())
 }
 
 #Preview("Currently Reading") {
-    BookDetailView(book: .sampleCurrentlyReading, viewModel: BookshelfViewModel())
+    BookDetailView(book: .sampleCurrentlyReading, viewModel: BookshelfViewModel(), timerViewModel: ReadingTimerViewModel())
 }
 
 #Preview("Read with Rating") {
-    BookDetailView(book: .sampleReadWithRating, viewModel: BookshelfViewModel())
+    BookDetailView(book: .sampleReadWithRating, viewModel: BookshelfViewModel(), timerViewModel: ReadingTimerViewModel())
 }
 
 #Preview("Read without Rating") {
-    BookDetailView(book: .sampleReadNoRating, viewModel: BookshelfViewModel())
+    BookDetailView(book: .sampleReadNoRating, viewModel: BookshelfViewModel(), timerViewModel: ReadingTimerViewModel())
 }
 
 #Preview("Detail Section") {

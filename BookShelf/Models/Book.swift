@@ -5,12 +5,16 @@ enum ReadStatus: String, Codable, CaseIterable {
     case wantToRead = "want_to_read"
     case currentlyReading = "currently_reading"
     case read = "read"
+    case paused = "paused"
+    case didNotFinish = "did_not_finish"
 
     var displayName: String {
         switch self {
         case .wantToRead: return "Want to Read"
         case .currentlyReading: return "Reading"
         case .read: return "Read"
+        case .paused: return "Paused"
+        case .didNotFinish: return "Did Not Finish"
         }
     }
 
@@ -19,7 +23,13 @@ enum ReadStatus: String, Codable, CaseIterable {
         case .wantToRead: return "bookmark.fill"
         case .currentlyReading: return "book.fill"
         case .read: return "checkmark.circle.fill"
+        case .paused: return "pause.circle.fill"
+        case .didNotFinish: return "xmark.circle.fill"
         }
+    }
+
+    var countsForChallenge: Bool {
+        self == .read
     }
 }
 
@@ -40,6 +50,7 @@ final class Book {
     var dateFinished: Date?
     var currentPage: Int?
     var progressPercentage: Double?
+    var dnfReason: String?
 
     var readStatus: ReadStatus {
         get { ReadStatus(rawValue: readStatusRaw) ?? .wantToRead }
@@ -196,7 +207,7 @@ extension Book {
     @MainActor
     static var previewContainer: ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let schema = Schema([Book.self, ReadingProgressEntry.self, ReadingGoal.self, ReadingChallenge.self])
+        let schema = Schema([Book.self, ReadingProgressEntry.self, ReadingGoal.self, ReadingChallenge.self, ReadingSession.self, BookNote.self, StreakFreeze.self])
         // swiftlint:disable:next force_try
         let container = try! ModelContainer(for: schema, configurations: config)
         for book in sampleBooks {

@@ -132,11 +132,13 @@ class BookshelfViewModel {
         case .wantToRead: newStatus = .currentlyReading
         case .currentlyReading: newStatus = .read
         case .read: newStatus = .wantToRead
+        case .paused: newStatus = .currentlyReading
+        case .didNotFinish: newStatus = .wantToRead
         }
         setReadStatus(book, status: newStatus)
     }
 
-    func setReadStatus(_ book: Book, status: ReadStatus) {
+    func setReadStatus(_ book: Book, status: ReadStatus, dnfReason: String? = nil) {
         guard let modelContext else { return }
 
         book.readStatus = status
@@ -158,12 +160,22 @@ class BookshelfViewModel {
         case .wantToRead:
             book.dateStarted = nil
             book.dateFinished = nil
+        case .paused:
+            // Keep progress and dateStarted, clear dateFinished
+            book.dateFinished = nil
+        case .didNotFinish:
+            // Set dateFinished, store reason, keep progress for history
+            if book.dateFinished == nil {
+                book.dateFinished = Date()
+            }
+            book.dnfReason = dnfReason
         }
 
         // Clear progress when moving to wantToRead
         if status == .wantToRead {
             book.currentPage = nil
             book.progressPercentage = nil
+            book.dnfReason = nil
             deleteProgressEntries(for: book.isbn)
         }
 
@@ -347,26 +359,36 @@ class BookshelfViewModel {
         return days
     }
 
+    /// Effective "today" with grace period: between midnight and 2 AM counts as previous day
+    private func effectiveToday() -> DateComponents {
+        let calendar = Calendar.current
+        let now = Date()
+        let hour = calendar.component(.hour, from: now)
+        let effectiveDate = hour < 2 ? calendar.date(byAdding: .day, value: -1, to: now)! : now
+        return calendar.dateComponents([.year, .month, .day], from: effectiveDate)
+    }
+
     func currentStreak() -> Int {
         let days = readingDays()
+        let freezeDays = fetchStreakFreezeDays()
         guard !days.isEmpty else { return 0 }
 
         let calendar = Calendar.current
-        let today = calendar.dateComponents([.year, .month, .day], from: Date())
+        let today = effectiveToday()
 
-        // Start from today; if no activity today, try yesterday
+        // Start from today; if no activity today and no freeze, try yesterday
         var checkDate = today
-        if !days.contains(checkDate) {
+        if !days.contains(checkDate) && !freezeDays.contains(checkDate) {
             guard let yesterday = calendar.date(byAdding: .day, value: -1, to: calendar.date(from: today)!) else { return 0 }
             checkDate = calendar.dateComponents([.year, .month, .day], from: yesterday)
-            if !days.contains(checkDate) {
+            if !days.contains(checkDate) && !freezeDays.contains(checkDate) {
                 return 0
             }
         }
 
         var streak = 0
         var current = checkDate
-        while days.contains(current) {
+        while days.contains(current) || freezeDays.contains(current) {
             streak += 1
             guard let prevDate = calendar.date(byAdding: .day, value: -1, to: calendar.date(from: current)!) else { break }
             current = calendar.dateComponents([.year, .month, .day], from: prevDate)
@@ -376,10 +398,12 @@ class BookshelfViewModel {
 
     func longestStreak() -> Int {
         let days = readingDays()
-        guard !days.isEmpty else { return 0 }
+        let freezeDays = fetchStreakFreezeDays()
+        let allDays = days.union(freezeDays)
+        guard !allDays.isEmpty else { return 0 }
 
         let calendar = Calendar.current
-        let sortedDates = days.compactMap { calendar.date(from: $0) }.sorted()
+        let sortedDates = allDays.compactMap { calendar.date(from: $0) }.sorted()
 
         var longest = 1
         var current = 1
@@ -392,10 +416,28 @@ class BookshelfViewModel {
             } else if daysBetween > 1 {
                 current = 1
             }
-            // daysBetween == 0 means same day (shouldn't happen with Set), skip
         }
 
         return longest
+    }
+
+    func streakMilestoneMessage() -> String? {
+        let streak = currentStreak()
+        switch streak {
+        case 7: return "One week streak!"
+        case 30: return "One month streak!"
+        case 100: return "100 days - incredible!"
+        case 365: return "One year streak!"
+        default: return nil
+        }
+    }
+
+    func streakLossMessage() -> String? {
+        let current = currentStreak()
+        guard current == 0 else { return nil }
+        let longest = longestStreak()
+        guard longest > 0 else { return nil }
+        return "You read \(longest) days in a row - amazing! Start a new streak today."
     }
 
     func hasReadToday() -> Bool {
@@ -605,5 +647,234 @@ class BookshelfViewModel {
         let aheadBy = booksRead - expectedBooks
 
         return (booksRead: booksRead, goal: challenge.goalCount, aheadBy: aheadBy)
+    }
+
+    // MARK: - Streak Freeze
+
+    func fetchStreakFreezeDays() -> Set<DateComponents> {
+        guard let modelContext else { return [] }
+
+        let descriptor = FetchDescriptor<StreakFreeze>()
+        guard let freezes = try? modelContext.fetch(descriptor) else { return [] }
+
+        let calendar = Calendar.current
+        var days = Set<DateComponents>()
+        for freeze in freezes {
+            days.insert(calendar.dateComponents([.year, .month, .day], from: freeze.dateUsed))
+        }
+        return days
+    }
+
+    func hasStreakFreezeAvailable() -> Bool {
+        guard let modelContext else { return false }
+
+        let calendar = Calendar.current
+        let now = Date()
+        let week = calendar.component(.weekOfYear, from: now)
+        let year = calendar.component(.year, from: now)
+
+        let descriptor = FetchDescriptor<StreakFreeze>(
+            predicate: #Predicate { $0.weekOfYear == week && $0.year == year }
+        )
+
+        guard let freezes = try? modelContext.fetch(descriptor) else { return true }
+        return freezes.isEmpty
+    }
+
+    func useStreakFreeze() -> Bool {
+        guard let modelContext else { return false }
+        guard hasStreakFreezeAvailable() else { return false }
+
+        let calendar = Calendar.current
+        let now = Date()
+        let freeze = StreakFreeze(
+            dateUsed: now,
+            weekOfYear: calendar.component(.weekOfYear, from: now),
+            year: calendar.component(.year, from: now)
+        )
+        modelContext.insert(freeze)
+
+        do {
+            try modelContext.save()
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    // MARK: - Timed Reading Sessions
+
+    func fetchTimedSessions(for isbn: String) -> [ReadingSession] {
+        guard let modelContext else { return [] }
+
+        let descriptor = FetchDescriptor<ReadingSession>(
+            predicate: #Predicate { $0.bookISBN == isbn },
+            sortBy: [SortDescriptor(\.startTime, order: .reverse)]
+        )
+
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            return []
+        }
+    }
+
+    func fetchAllTimedSessions() -> [ReadingSession] {
+        guard let modelContext else { return [] }
+
+        let descriptor = FetchDescriptor<ReadingSession>(
+            sortBy: [SortDescriptor(\.startTime, order: .reverse)]
+        )
+
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            return []
+        }
+    }
+
+    // MARK: - Reading Insights
+
+    func estimatedCompletionDate(for book: Book) -> Date? {
+        guard let current = book.currentPage, let total = book.pageCount, current < total else { return nil }
+
+        if let pace = readingPace(for: book.isbn), pace > 0 {
+            let remaining = total - current
+            let daysLeft = Double(remaining) / pace
+            return Calendar.current.date(byAdding: .day, value: Int(ceil(daysLeft)), to: Date())
+        }
+
+        return nil
+    }
+
+    func pagesPerHour(for isbn: String) -> Double? {
+        let sessions = fetchTimedSessions(for: isbn)
+        let validSessions = sessions.filter { ($0.pagesRead ?? 0) > 0 && $0.duration > 0 }
+        guard !validSessions.isEmpty else { return nil }
+
+        let totalPages = validSessions.compactMap(\.pagesRead).reduce(0, +)
+        let totalHours = validSessions.map(\.duration).reduce(0, +) / 3600.0
+        guard totalHours > 0 else { return nil }
+
+        return Double(totalPages) / totalHours
+    }
+
+    func preferredReadingTime() -> String? {
+        let sessions = fetchAllTimedSessions()
+        guard !sessions.isEmpty else { return nil }
+
+        let calendar = Calendar.current
+        var hourCounts: [Int: Int] = [:]
+        for session in sessions {
+            let hour = calendar.component(.hour, from: session.startTime)
+            hourCounts[hour, default: 0] += 1
+        }
+
+        guard let peakHour = hourCounts.max(by: { $0.value < $1.value })?.key else { return nil }
+
+        switch peakHour {
+        case 5..<12: return "morning"
+        case 12..<17: return "afternoon"
+        case 17..<21: return "evening"
+        default: return "night"
+        }
+    }
+
+    func bestReadingWeek() -> Int? {
+        let entries = fetchAllProgressEntries()
+        guard entries.count >= 2 else { return nil }
+
+        let calendar = Calendar.current
+        var weeklyPages: [String: Int] = [:]
+
+        let sorted = entries.sorted { $0.timestamp < $1.timestamp }
+        let grouped = Dictionary(grouping: sorted) { $0.bookISBN }
+
+        for (_, bookEntries) in grouped {
+            for i in 1..<bookEntries.count {
+                let prev = bookEntries[i - 1]
+                let curr = bookEntries[i]
+                guard let prevPage = prev.page, let currPage = curr.page, currPage > prevPage else { continue }
+                let weekInterval = calendar.dateInterval(of: .weekOfYear, for: curr.timestamp)!
+                let weekKey = weekInterval.start.timeIntervalSince1970.description
+                weeklyPages[weekKey, default: 0] += currPage - prevPage
+            }
+        }
+
+        return weeklyPages.values.max()
+    }
+
+    func weeklySummary() -> (pages: Int, books: Int) {
+        let pages = pagesReadInPeriod(thisWeekInterval)
+        let books = booksFinished(in: thisWeekInterval).count
+        return (pages: pages, books: books)
+    }
+
+    // MARK: - Notes & Quotes
+
+    func saveNote(bookISBN: String, text: String, noteType: NoteType, pageNumber: Int? = nil, sourceImageData: Data? = nil) {
+        guard let modelContext else { return }
+
+        let note = BookNote(
+            bookISBN: bookISBN,
+            text: text,
+            noteType: noteType,
+            pageNumber: pageNumber,
+            sourceImageData: sourceImageData
+        )
+        modelContext.insert(note)
+
+        do {
+            try modelContext.save()
+        } catch {
+            showError(message: "Failed to save note: \(error.localizedDescription)")
+        }
+    }
+
+    func fetchNotes(for isbn: String) -> [BookNote] {
+        guard let modelContext else { return [] }
+
+        let descriptor = FetchDescriptor<BookNote>(
+            predicate: #Predicate { $0.bookISBN == isbn },
+            sortBy: [SortDescriptor(\.dateCreated, order: .reverse)]
+        )
+
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            return []
+        }
+    }
+
+    func fetchAllQuotes() -> [BookNote] {
+        guard let modelContext else { return [] }
+
+        let quoteRaw = NoteType.quote.rawValue
+        let descriptor = FetchDescriptor<BookNote>(
+            predicate: #Predicate { $0.noteTypeRaw == quoteRaw },
+            sortBy: [SortDescriptor(\.dateCreated, order: .reverse)]
+        )
+
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            return []
+        }
+    }
+
+    func randomQuote() -> BookNote? {
+        let quotes = fetchAllQuotes()
+        return quotes.randomElement()
+    }
+
+    func deleteNote(_ note: BookNote) {
+        guard let modelContext else { return }
+
+        modelContext.delete(note)
+        do {
+            try modelContext.save()
+        } catch {
+            showError(message: "Failed to delete note: \(error.localizedDescription)")
+        }
     }
 }

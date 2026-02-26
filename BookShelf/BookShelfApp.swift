@@ -10,7 +10,10 @@ struct BookShelfApp: App {
             Book.self,
             ReadingProgressEntry.self,
             ReadingGoal.self,
-            ReadingChallenge.self
+            ReadingChallenge.self,
+            ReadingSession.self,
+            BookNote.self,
+            StreakFreeze.self
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,
