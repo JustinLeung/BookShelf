@@ -6,13 +6,17 @@ An iOS app that lets you scan book covers and barcodes to build a personal readi
 
 ## Features
 
-- **Onboarding** — Three-screen onboarding flow introducing scanning, searching, and tracking on first launch
+- **Onboarding** — Four-screen onboarding flow introducing scanning, searching, tracking, and stats/goals on first launch
 - **Barcode & Cover Scanning** — Scan ISBN barcodes or use OCR to recognize text on book covers via Apple's Vision framework and `DataScannerViewController`
 - **Smart Book Search** — Multi-strategy search that queries Google Books API with precise operators, falls back to Open Library, and ranks results by relevance
 - **Reading List** — Track books as "Want to Read", "Currently Reading", or "Read" with on-device persistence via SwiftData
 - **Star Ratings** — Rate books you've read on a 1–5 star scale
 - **Reading Progress** — Track current page with a circular progress ring, quick-increment buttons with haptics, reading session history, pace tracking (~pages/day), and estimated completion
-- **Book Details** — View cover art, author, publisher, page count, and description
+- **Reading Stats & Streaks** — Lifetime stats (books, pages, average rating, pace), current and longest reading streaks, time-based summaries (this week/month/year), and a compact stats summary card on the bookshelf
+- **Reading Goals** — Set daily and weekly page goals with progress bars that update as you log reading sessions
+- **Reading Garden** — A light visual garden where each finished book grows a plant (SF Symbols), sized by page count and styled by rating — purely informational, not a reward mechanic
+- **Reminders** — Daily reading reminders at a custom time, plus streak protection notifications at 9 PM when your streak is at risk
+- **Book Details** — Tabbed detail view with pinned header (cover, title, status badge), an "Activity" tab showing status-contextual actions (progress tracking, ratings, purchase links), and an "About" tab with description and metadata
 - **Quick Links** — Jump directly to Amazon or Audible to purchase a book
 - **Image Caching** — Two-tier caching system (in-memory + disk) for cover images
 - **Startup Performance** — Loading state prevents empty-state flash, async off-main-thread cover image decoding for smooth scrolling, and deduplicated database fetches on launch
@@ -22,6 +26,7 @@ An iOS app that lets you scan book covers and barcodes to build a personal readi
 
 - **SwiftUI** — Declarative UI
 - **SwiftData** — On-device persistence
+- **UserNotifications** — Local push notifications for reading reminders
 - **Vision / VisionKit** — Barcode detection and OCR
 - **Google Books API** — Primary book metadata source
 - **Open Library API** — Fallback metadata source
@@ -43,25 +48,30 @@ An iOS app that lets you scan book covers and barcodes to build a personal readi
 BookShelf/
 ├── Models/
 │   ├── Book.swift               # SwiftData model
-│   └── ReadingProgressEntry.swift # Reading session history model
+│   ├── ReadingProgressEntry.swift # Reading session history model
+│   └── ReadingGoal.swift        # Daily/weekly page goal model
 ├── Views/
-│   ├── ContentView.swift        # Tab navigation
+│   ├── ContentView.swift        # Root view with onboarding + streak reminder
 │   ├── OnboardingView.swift     # First-launch onboarding flow
-│   ├── BookshelfView.swift      # Main library grid
+│   ├── BookshelfView.swift      # Main library grid with FAB + stats
+│   ├── AddBookView.swift        # Combined search & scan sheet
 │   ├── BookDetailView.swift     # Book details & status toggle
 │   ├── BookCoverView.swift      # Async off-main-thread cover image decoding
+│   ├── StatsSummaryCard.swift   # Compact stats card on bookshelf
+│   ├── StatsView.swift          # Full stats: garden, streaks, goals, reminders
+│   ├── GoalSettingView.swift    # Daily/weekly goal setting sheet
 │   ├── StarRatingView.swift     # Interactive 1-5 star rating
 │   ├── CircularProgressRing.swift # Animated circular progress ring
 │   ├── ReadingProgressBar.swift # Thin progress bar for grid items
 │   ├── ProgressUpdateView.swift # Sheet for updating reading progress
-│   ├── ScannerView.swift        # Barcode & OCR scanning
-│   └── ManualSearchView.swift   # Search by ISBN or title
+│   └── ScannerView.swift        # Barcode scanner, camera, OCR processing
 ├── ViewModels/
-│   └── BookshelfViewModel.swift # Observable view model
+│   └── BookshelfViewModel.swift # Observable view model + stats/goal methods
 └── Services/
     ├── GoogleBooksService.swift  # Google Books API client
     ├── BookAPIService.swift      # Search orchestration & Open Library fallback
-    └── ImageCacheService.swift   # Memory + disk image cache
+    ├── ImageCacheService.swift   # Memory + disk image cache
+    └── NotificationService.swift # Daily + streak reminder scheduling
 ```
 
 ## Previews
@@ -70,7 +80,7 @@ Every view includes named `#Preview` variants with sample data, wrapped in `#if 
 
 | View | Previews |
 |------|----------|
-| OnboardingView | Onboarding Flow, Welcome Page, Add Books Page, Track Reading Page |
+| OnboardingView | Onboarding Flow, Welcome Page, Add Books Page, Track Reading Page, Stats & Goals Page |
 | ContentView | With Books, Empty |
 | BookshelfView | Populated, Empty, Grid Item variants |
 | BookDetailView | Want to Read, Currently Reading, Read (rated/unrated), DetailSection, DetailRow |
@@ -79,8 +89,10 @@ Every view includes named `#Preview` variants with sample data, wrapped in `#if 
 | CircularProgressRing | 0%, 38%, 75%, 100%, Compact |
 | ReadingProgressBar | 0%, 38%, 75%, 100% |
 | ProgressUpdateView | With Page Count, Without Page Count |
-| ManualSearchView | Empty, Search Result Row, Search Result Row (in shelf) |
-| ScannerView | Scanner landing page |
+| AddBookView | Empty, Search Result Row, Search Result Row (in shelf) |
+| StatsSummaryCard | Stats Summary Card |
+| StatsView | Stats View |
+| GoalSettingView | Goal Setting |
 
 ## License
 

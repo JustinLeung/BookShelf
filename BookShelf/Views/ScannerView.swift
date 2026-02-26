@@ -4,265 +4,20 @@ import VisionKit
 import Vision
 import AVFoundation
 
-struct ScannerView: View {
-    @Environment(\.dismiss) private var dismiss
-    @Bindable var viewModel: BookshelfViewModel
+// MARK: - OCR Status
 
-    @State private var isShowingScanner = false
-    @State private var isShowingCamera = false
-    @State private var scannedISBN: String?
-    @State private var showManualEntry = false
-    @State private var showOCRResults = false
-    @State private var ocrStatus: OCRStatus = .idle
-    @State private var ocrSearchQuery: String?
+enum OCRStatus: Equatable {
+    case idle
+    case processing
+    case searching(String)
+    case found(Int)
+    case error(String)
+}
 
-    enum OCRStatus: Equatable {
-        case idle
-        case processing
-        case searching(String)
-        case found(Int)
-        case error(String)
-    }
+// MARK: - OCR Processor
 
-    var body: some View {
-        NavigationStack {
-            VStack(spacing: 24) {
-                Spacer()
-
-                Image(systemName: "barcode.viewfinder")
-                    .font(.system(size: 80))
-                    .foregroundStyle(Color.accentColor)
-
-                Text("Scan Book")
-                    .font(.title2)
-                    .fontWeight(.semibold)
-
-                Text("Scan the ISBN barcode or take a photo of the book cover")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-
-                VStack(spacing: 12) {
-                    if DataScannerViewController.isSupported && DataScannerViewController.isAvailable {
-                        Button {
-                            isShowingScanner = true
-                        } label: {
-                            Label("Scan Barcode", systemImage: "barcode.viewfinder")
-                                .font(.headline)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.accentColor)
-                                .foregroundStyle(.white)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                    }
-
-                    Button {
-                        isShowingCamera = true
-                    } label: {
-                        Label("Photo of Cover", systemImage: "camera.fill")
-                            .font(.headline)
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            .background(Color.orange)
-                            .foregroundStyle(.white)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                    }
-                }
-                .padding(.horizontal, 32)
-
-                Button {
-                    showManualEntry = true
-                } label: {
-                    Text("Enter ISBN Manually")
-                        .font(.subheadline)
-                        .foregroundStyle(Color.accentColor)
-                }
-
-                Spacer()
-
-                statusView
-            }
-            .navigationTitle("Scan")
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $isShowingScanner) {
-                DataScannerRepresentable(scannedISBN: $scannedISBN)
-                    .ignoresSafeArea()
-            }
-            .sheet(isPresented: $isShowingCamera) {
-                CameraCaptureView { image in
-                    processImageWithOCR(image)
-                }
-            }
-            .sheet(isPresented: $showManualEntry) {
-                ManualISBNEntrySheet(viewModel: viewModel)
-            }
-            .sheet(isPresented: $showOCRResults) {
-                OCRResultsSheet(viewModel: viewModel, searchQuery: ocrSearchQuery ?? "")
-            }
-            .onChange(of: scannedISBN) { _, newValue in
-                if let isbn = newValue {
-                    Task {
-                        await viewModel.lookupBook(isbn: isbn)
-                        scannedISBN = nil
-                    }
-                }
-            }
-            .alert("Error", isPresented: $viewModel.showError) {
-                Button("OK", role: .cancel) {}
-            } message: {
-                Text(viewModel.errorMessage ?? "Unknown error")
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var statusView: some View {
-        switch ocrStatus {
-        case .idle:
-            if viewModel.isLoading {
-                ProgressView("Looking up book...")
-                    .padding()
-            }
-        case .processing:
-            VStack(spacing: 8) {
-                ProgressView()
-                Text("Reading text from image...")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            .padding()
-        case .searching(let text):
-            VStack(spacing: 8) {
-                ProgressView()
-                Text("Searching for: \(text)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-            .padding()
-        case .found(let count):
-            VStack(spacing: 8) {
-                Image(systemName: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-                    .font(.title)
-                Text("Found \(count) result\(count == 1 ? "" : "s")")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            .padding()
-        case .error(let message):
-            Text(message)
-                .font(.subheadline)
-                .foregroundStyle(.red)
-                .padding()
-        }
-    }
-
-    private func processImageWithOCR(_ image: UIImage) {
-        ocrStatus = .processing
-
-        Task {
-            do {
-                let recognizedText = try await performOCR(on: image)
-                print("=== OCR RECOGNIZED TEXT ===")
-                print(recognizedText)
-                print("=== END OCR TEXT ===")
-
-                // First try to find an ISBN in the text
-                if let isbn = extractISBN(from: recognizedText) {
-                    print("Found ISBN: \(isbn)")
-                    ocrStatus = .searching(isbn)
-                    await viewModel.lookupBook(isbn: isbn)
-                    ocrStatus = .idle
-                    return
-                }
-
-                // Apply OCR error corrections
-                let correctedText = correctOCRErrors(recognizedText)
-                if correctedText != recognizedText {
-                    print("=== OCR CORRECTED TEXT ===")
-                    print(correctedText)
-                    print("=== END CORRECTED TEXT ===")
-                }
-
-                // Extract title and author from OCR text
-                let extracted = extractTitleAndAuthor(from: correctedText)
-                print("Extracted - Title: '\(extracted.title ?? "nil")', Author: '\(extracted.author ?? "nil")'")
-
-                // Also try to find potential author names for fallback search
-                let potentialNames = findPotentialAuthorNames(from: correctedText)
-                print("Potential author names found: \(potentialNames)")
-
-                guard let title = extracted.title, !title.isEmpty else {
-                    // Fallback: if we found potential names, search with just those
-                    if !potentialNames.isEmpty {
-                        let authorQuery = potentialNames.joined(separator: " ")
-                        ocrStatus = .searching(authorQuery)
-                        let fallbackResults = try await BookAPIService.shared.smartSearch(
-                            query: authorQuery,
-                            author: nil
-                        )
-                        if !fallbackResults.isEmpty {
-                            viewModel.searchResults = fallbackResults
-                            ocrSearchQuery = authorQuery
-                            ocrStatus = .found(fallbackResults.count)
-                            try? await Task.sleep(for: .seconds(0.5))
-                            showOCRResults = true
-                            ocrStatus = .idle
-                            return
-                        }
-                    }
-
-                    ocrStatus = .error("Could not find book information in the image")
-                    try? await Task.sleep(for: .seconds(3))
-                    ocrStatus = .idle
-                    return
-                }
-
-                // Use smart search with Google Books (primary) + Open Library (fallback)
-                let displayQuery = extracted.author != nil ? "\(title) by \(extracted.author!)" : title
-                ocrStatus = .searching(displayQuery)
-
-                var results = try await BookAPIService.shared.smartSearch(
-                    query: title,
-                    author: extracted.author
-                )
-
-                // Fallback: if no results and we have potential names, try searching with just the names
-                if results.isEmpty && !potentialNames.isEmpty {
-                    let authorQuery = potentialNames.joined(separator: " ")
-                    print("Fallback search with potential author: '\(authorQuery)'")
-                    ocrStatus = .searching(authorQuery)
-                    results = try await BookAPIService.shared.smartSearch(
-                        query: authorQuery,
-                        author: nil
-                    )
-                }
-
-                if results.isEmpty {
-                    ocrStatus = .error("No books found. Try taking a clearer photo.")
-                    try? await Task.sleep(for: .seconds(3))
-                    ocrStatus = .idle
-                } else {
-                    viewModel.searchResults = results
-                    ocrSearchQuery = displayQuery
-                    ocrStatus = .found(results.count)
-                    try? await Task.sleep(for: .seconds(0.5))
-                    showOCRResults = true
-                    ocrStatus = .idle
-                }
-            } catch {
-                print("OCR error: \(error)")
-                ocrStatus = .error("Search failed: \(error.localizedDescription)")
-                try? await Task.sleep(for: .seconds(3))
-                ocrStatus = .idle
-            }
-        }
-    }
-
-    private func performOCR(on image: UIImage) async throws -> String {
+enum OCRProcessor {
+    static func performOCR(on image: UIImage) async throws -> String {
         guard let cgImage = image.cgImage else {
             throw OCRError.invalidImage
         }
@@ -279,30 +34,15 @@ struct ScannerView: View {
                     return
                 }
 
-                // Calculate size statistics to filter small text
                 let sizes = observations.map { $0.boundingBox.height }
                 let maxHeight = sizes.max() ?? 0
                 let avgHeight = sizes.isEmpty ? 0 : sizes.reduce(0, +) / CGFloat(sizes.count)
-
-                // Dynamic threshold: keep text that is at least 40% of max height or above average
-                // This filters out small blurbs while keeping title and author
                 let sizeThreshold = max(maxHeight * 0.35, avgHeight * 0.8)
 
-                print("[OCR] Max text height: \(maxHeight), Avg: \(avgHeight), Threshold: \(sizeThreshold)")
-
-                // Filter to keep only larger text (likely title/author)
                 let significantObservations = observations.filter { obs in
-                    let height = obs.boundingBox.height
-                    let isLargeEnough = height >= sizeThreshold
-
-                    if let text = obs.topCandidates(1).first?.string {
-                        print("[OCR] '\(text)' - height: \(String(format: "%.3f", height)) - \(isLargeEnough ? "KEEP" : "skip")")
-                    }
-
-                    return isLargeEnough
+                    obs.boundingBox.height >= sizeThreshold
                 }
 
-                // Sort by vertical position (top to bottom) then by size (larger first)
                 let sortedObservations = significantObservations.sorted { obs1, obs2 in
                     let y1 = 1 - obs1.boundingBox.midY
                     let y2 = 1 - obs2.boundingBox.midY
@@ -332,8 +72,7 @@ struct ScannerView: View {
         }
     }
 
-    private func extractISBN(from text: String) -> String? {
-        // Look for ISBN patterns: ISBN-10 or ISBN-13
+    static func extractISBN(from text: String) -> String? {
         let patterns = [
             "ISBN[- ]?1[03][- ]?:?[- ]?([0-9X-]{10,17})",
             "ISBN[- ]?:?[- ]?([0-9X-]{10,17})",
@@ -361,20 +100,16 @@ struct ScannerView: View {
     }
 
     // swiftlint:disable cyclomatic_complexity
-    /// Extracts likely title and author from OCR text
-    /// Returns a tuple with the best guess for title and author (author may be nil)
-    private func extractTitleAndAuthor(from text: String) -> (title: String?, author: String?) {
+    static func extractTitleAndAuthor(from text: String) -> (title: String?, author: String?) {
         let lines = text.components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
 
-        // Text to completely exclude
         let excludeExact = Set([
             "new york", "times", "bestseller", "bestselling", "best seller",
             "#1", "national", "international", "a novel", "a memoir", "a thriller"
         ])
 
-        // Patterns to exclude (partial match)
         let excludeContains = [
             "million copies", "author of", "copyright", "all rights",
             "published by", "isbn", "introduction by", "foreword by",
@@ -384,7 +119,6 @@ struct ScannerView: View {
             "living a good life"
         ]
 
-        // First pass: clean all lines
         var cleanedLines: [String] = []
         for line in lines {
             let cleaned = line
@@ -397,46 +131,28 @@ struct ScannerView: View {
 
             let lowercased = cleaned.lowercased()
 
-            // Skip excluded exact matches
-            if excludeExact.contains(lowercased) {
-                continue
-            }
-
-            // Skip excluded patterns
-            if excludeContains.contains(where: { lowercased.contains($0) }) {
-                continue
-            }
-
-            // Skip very short lines
-            if cleaned.count < 2 {
-                continue
-            }
+            if excludeExact.contains(lowercased) { continue }
+            if excludeContains.contains(where: { lowercased.contains($0) }) { continue }
+            if cleaned.count < 2 { continue }
 
             cleanedLines.append(cleaned)
         }
 
-        // Look for author name - check for single-word lines that could be FIRST LAST
         var potentialAuthor: String?
         var authorLineIndices: Set<Int> = []
 
-        // Collect all single-word name parts (like "HARUKI", "MURAKAMI")
         var singleNameParts: [(index: Int, name: String)] = []
         for (index, line) in cleanedLines.enumerated() where looksLikeSingleNamePart(line) {
             singleNameParts.append((index: index, name: line))
         }
 
-        // Strategy 1: If we have exactly 2 single name parts, combine them (handles non-adjacent too)
-        // This catches cases like "MURAKAMI" ... "HARUKI" scattered in the OCR
         if singleNameParts.count == 2 && potentialAuthor == nil {
-            // Combine in the order they appear, or try both orders
             let combined = "\(singleNameParts[0].name) \(singleNameParts[1].name)"
             potentialAuthor = combined
             authorLineIndices.insert(singleNameParts[0].index)
             authorLineIndices.insert(singleNameParts[1].index)
-            print("Detected author from two name parts: \(combined)")
         }
 
-        // Strategy 2: If we have more than 2 single name parts, try adjacent pairs first
         if singleNameParts.count > 2 && potentialAuthor == nil {
             for i in 0..<cleanedLines.count {
                 let line = cleanedLines[i]
@@ -448,7 +164,6 @@ struct ScannerView: View {
                             potentialAuthor = combined
                             authorLineIndices.insert(i)
                             authorLineIndices.insert(i + 1)
-                            print("Detected author from adjacent lines: \(combined)")
                             break
                         }
                     }
@@ -456,22 +171,17 @@ struct ScannerView: View {
             }
         }
 
-        // Strategy 3: Look for a line that looks like a full author name (2-3 words)
         if potentialAuthor == nil {
             for (index, line) in cleanedLines.enumerated() where looksLikeAuthorName(line) {
                 potentialAuthor = line
                 authorLineIndices.insert(index)
-                print("Detected author: \(line)")
                 break
             }
         }
 
-        // Collect all words from non-author lines for title reconstruction
         var allWords: [String] = []
         for (index, line) in cleanedLines.enumerated() {
-            if authorLineIndices.contains(index) {
-                continue
-            }
+            if authorLineIndices.contains(index) { continue }
 
             let words = line.components(separatedBy: .whitespaces)
                 .map { $0.trimmingCharacters(in: .punctuationCharacters) }
@@ -485,74 +195,29 @@ struct ScannerView: View {
             }
         }
 
-        print("All words collected: \(allWords)")
-        print("Potential author: \(potentialAuthor ?? "none")")
-
-        // Try to reconstruct a known title pattern or build a search query
         let title = buildSearchQuery(from: allWords)
 
         return (title: title, author: potentialAuthor)
     }
     // swiftlint:enable cyclomatic_complexity
 
-    /// Builds a search query from collected words
-    private func buildSearchQuery(from words: [String]) -> String? {
-        guard !words.isEmpty else { return nil }
-
-        // Words to exclude from the query (marketing, common filler)
-        // NOTE: Keep "and" if it appears multiple times (likely part of title like "Tomorrow and Tomorrow")
-        let excludeWords = Set([
-            "the", "a", "an", "to", "of", "or", "in", "on", "by", "for",
-            "taut", "tight", "suspenseful", "spellbinding", "witty", "wonderful",
-            "mesmerizing", "globe", "boston"
-        ])
-
-        // Check if "and" appears multiple times - if so, it's likely part of the title
-        let andCount = words.filter { $0.lowercased() == "and" }.count
-        let keepAnd = andCount >= 2
-
-        // Filter to significant words only
-        let significantWords = words.filter { word in
-            let lower = word.lowercased()
-            if lower == "and" && keepAnd {
-                return true  // Keep "and" if it appears multiple times
-            }
-            return !excludeWords.contains(lower)
-        }
-
-        // Take the most significant words (up to 8 for longer titles)
-        let queryWords = Array(significantWords.prefix(8))
-
-        if queryWords.isEmpty {
-            // Fallback to original words if all were filtered
-            return words.prefix(6).joined(separator: " ")
-        }
-
-        return queryWords.joined(separator: " ")
-    }
-
-    /// Corrects common OCR misreadings
-    private func correctOCRErrors(_ text: String) -> String {
+    static func correctOCRErrors(_ text: String) -> String {
         var corrected = text
 
-        // Common OCR character substitutions for author names
         let charCorrections: [(String, String)] = [
-            // Gabrielle Zevin variations
-            ("CABRIELLE", "GABRIELLE"),   // C misread as G
-            ("GABRJELLE", "GABRIELLE"),   // J misread as I
-            ("GABR1ELLE", "GABRIELLE"),   // 1 misread as I
-            ("CABR1ELLE", "GABRIELLE"),   // C and 1 misread
-            ("ZEV1N", "ZEVIN"),            // 1 misread as I
-            ("2EVIN", "ZEVIN"),            // 2 misread as Z
-            ("MINAZ", "ZEVIN"),            // Complete misread - stylized font
-            ("ZEWIN", "ZEVIN"),            // W misread as V
-            ("ZEVJN", "ZEVIN"),            // J misread as I
-
-            // Common OCR mistakes
-            ("RÉST", "BEST"),              // B misread as R
-            ("8EST", "BEST"),              // 8 misread as B
-            ("AUTH0R", "AUTHOR"),          // 0 misread as O
-            ("N0VEL", "NOVEL"),            // 0 misread as O
+            ("CABRIELLE", "GABRIELLE"),
+            ("GABRJELLE", "GABRIELLE"),
+            ("GABR1ELLE", "GABRIELLE"),
+            ("CABR1ELLE", "GABRIELLE"),
+            ("ZEV1N", "ZEVIN"),
+            ("2EVIN", "ZEVIN"),
+            ("MINAZ", "ZEVIN"),
+            ("ZEWIN", "ZEVIN"),
+            ("ZEVJN", "ZEVIN"),
+            ("RÉST", "BEST"),
+            ("8EST", "BEST"),
+            ("AUTH0R", "AUTHOR"),
+            ("N0VEL", "NOVEL"),
         ]
 
         for (wrong, right) in charCorrections {
@@ -566,28 +231,7 @@ struct ScannerView: View {
         return corrected
     }
 
-    /// Checks if a word looks like a potential name (relaxed matching for OCR errors)
-    private func looksLikePotentialName(_ text: String) -> Bool {
-        let cleaned = text.trimmingCharacters(in: .whitespaces)
-        guard cleaned.count >= 4 else { return false }
-
-        // Must be mostly letters (allow 1 number for OCR errors like "ZEV1N")
-        let letterCount = cleaned.filter { $0.isLetter }.count
-        let ratio = Double(letterCount) / Double(cleaned.count)
-        guard ratio >= 0.8 else { return false }
-
-        // Not a common non-name word
-        let notNameWords = Set([
-            "the", "and", "for", "not", "art", "new", "old", "stories", "essays",
-            "novel", "tales", "memoir", "national", "international", "bestseller",
-            "author", "best-sens", "bestselling"
-        ])
-
-        return !notNameWords.contains(cleaned.lowercased())
-    }
-
-    /// Finds potential author names from OCR text for fallback searching
-    private func findPotentialAuthorNames(from text: String) -> [String] {
+    static func findPotentialAuthorNames(from text: String) -> [String] {
         let lines = text.components(separatedBy: .newlines)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
@@ -595,12 +239,10 @@ struct ScannerView: View {
         var potentialNames: [String] = []
         var fullNameCandidates: [(name: String, score: Int)] = []
 
-        // Words that are definitely not names (expanded list)
         let excludeWords = Set([
             "and", "the", "a", "an", "of", "or", "by", "for", "to", "in", "on",
             "novel", "author", "bestseller", "bestselling", "best-sens", "times",
             "new", "york", "national", "international", "best", "seller",
-            // Common title words
             "between", "kingdoms", "two", "three", "four", "five", "before", "after",
             "under", "over", "within", "without", "beyond", "life", "death", "love",
             "time", "world", "year", "years", "memoir", "story", "book", "books",
@@ -608,13 +250,11 @@ struct ScannerView: View {
             "review", "one", "was", "would", "chanel", "miller"
         ])
 
-        // First pass: look for lines that look like "FIRSTNAME LASTNAME" (full author names)
         for line in lines {
             let cleaned = line.trimmingCharacters(in: .punctuationCharacters)
                 .trimmingCharacters(in: .whitespaces)
             let words = cleaned.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
 
-            // Author names are typically 2-3 words
             if words.count >= 2 && words.count <= 3 {
                 let allLookLikeNames = words.allSatisfy { word in
                     let lower = word.lowercased()
@@ -625,19 +265,14 @@ struct ScannerView: View {
                 }
 
                 if allLookLikeNames {
-                    // Score based on characteristics
                     var score = 10
-                    // Bonus for all caps (common for author names on covers)
                     if cleaned == cleaned.uppercased() { score += 5 }
-                    // Bonus for 2 words (most common author name format)
                     if words.count == 2 { score += 3 }
-
                     fullNameCandidates.append((name: cleaned, score: score))
                 }
             }
         }
 
-        // Sort by score and take the best full name candidate
         fullNameCandidates.sort { $0.score > $1.score }
         if let bestCandidate = fullNameCandidates.first {
             let words = bestCandidate.name.components(separatedBy: .whitespaces)
@@ -649,7 +284,6 @@ struct ScannerView: View {
             return potentialNames
         }
 
-        // Fallback: look for individual name-like words
         for line in lines {
             let words = line.components(separatedBy: .whitespaces)
                 .map { $0.trimmingCharacters(in: .punctuationCharacters) }
@@ -659,24 +293,17 @@ struct ScannerView: View {
                 let cleaned = word.trimmingCharacters(in: .punctuationCharacters)
                 let lower = cleaned.lowercased()
 
-                // Skip excluded words
                 if excludeWords.contains(lower) { continue }
-
-                // Skip short words or numbers
                 if cleaned.count < 4 { continue }
                 if cleaned.allSatisfy({ $0.isNumber }) { continue }
 
-                // Check if it looks like a name (starts with capital, mostly letters)
                 let letterCount = cleaned.filter { $0.isLetter }.count
                 if letterCount < cleaned.count - 1 { continue }
 
-                // Must start with uppercase
                 guard let first = cleaned.first, first.isUppercase else { continue }
 
-                // Apply OCR corrections
                 let corrected = correctOCRErrors(cleaned)
 
-                // Add if it looks like a name
                 if corrected.count >= 4 && corrected.first?.isUppercase == true {
                     let normalized = corrected.prefix(1).uppercased() + corrected.dropFirst().lowercased()
                     if !potentialNames.contains(normalized) {
@@ -686,38 +313,59 @@ struct ScannerView: View {
             }
         }
 
-        // Limit to top 2 most likely names
         return Array(potentialNames.prefix(2))
     }
 
-    /// Checks if a string looks like a single name part (first or last name alone)
-    /// Used to detect split author names like "HARUKI" on one line and "MURAKAMI" on another
-    private func looksLikeSingleNamePart(_ text: String) -> Bool {
+    // MARK: - Private Helpers
+
+    private static func buildSearchQuery(from words: [String]) -> String? {
+        guard !words.isEmpty else { return nil }
+
+        let excludeWords = Set([
+            "the", "a", "an", "to", "of", "or", "in", "on", "by", "for",
+            "taut", "tight", "suspenseful", "spellbinding", "witty", "wonderful",
+            "mesmerizing", "globe", "boston"
+        ])
+
+        let andCount = words.filter { $0.lowercased() == "and" }.count
+        let keepAnd = andCount >= 2
+
+        let significantWords = words.filter { word in
+            let lower = word.lowercased()
+            if lower == "and" && keepAnd {
+                return true
+            }
+            return !excludeWords.contains(lower)
+        }
+
+        let queryWords = Array(significantWords.prefix(8))
+
+        if queryWords.isEmpty {
+            return words.prefix(6).joined(separator: " ")
+        }
+
+        return queryWords.joined(separator: " ")
+    }
+
+    private static func looksLikeSingleNamePart(_ text: String) -> Bool {
         let cleaned = text.trimmingCharacters(in: .whitespaces)
         let words = cleaned.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
 
-        // Must be exactly one word
         guard words.count == 1 else { return false }
 
         let word = words[0]
 
-        // Must be all letters
         guard word.allSatisfy({ $0.isLetter }) else { return false }
-
-        // Must be at least 3 characters (to avoid "A", "OF", etc.)
         guard word.count >= 3 else { return false }
 
-        // Accept ALL CAPS or Title Case (relaxed for OCR that detects mixed case)
         let isAllCaps = word == word.uppercased()
         let isTitleCase = word.first?.isUppercase == true && word.count >= 4
         guard isAllCaps || isTitleCase else { return false }
 
-        // Not a common non-name word (includes common title words)
         let notNameWords = Set([
             "the", "and", "for", "not", "art", "new", "old", "stories", "essays",
             "novel", "tales", "memoir", "national", "international", "bestseller",
             "first", "person", "singular", "plural", "mesmerizing", "author",
-            // Common title words that get OCR'd as separate lines
             "between", "kingdoms", "two", "three", "four", "five", "before", "after",
             "under", "over", "within", "without", "beyond", "behind", "above", "below",
             "through", "across", "against", "toward", "towards", "into", "onto",
@@ -730,14 +378,11 @@ struct ScannerView: View {
         return !notNameWords.contains(word.lowercased())
     }
 
-    /// Checks if a string looks like an author name
-    private func looksLikeAuthorName(_ text: String) -> Bool {
+    private static func looksLikeAuthorName(_ text: String) -> Bool {
         let words = text.components(separatedBy: .whitespaces).filter { !$0.isEmpty }
 
-        // Author names are typically 2-3 words (First Last or First Middle Last)
         guard words.count >= 2 && words.count <= 4 else { return false }
 
-        // Phrases that are definitely NOT author names (check full text)
         let notAuthorPhrases = Set([
             "national bestseller", "international bestseller", "new york times",
             "best seller", "bestseller", "first person", "stories essays",
@@ -748,14 +393,12 @@ struct ScannerView: View {
             return false
         }
 
-        // Common title/marketing words that are NOT author name parts
         let notAuthorWords = Set([
             "the", "a", "an", "of", "and", "or", "to", "in", "on", "by", "for", "with",
             "art", "not", "giving", "subtle", "stories", "novel", "tales", "essays",
             "memoir", "life", "death", "love", "time", "world", "new", "old", "last",
             "first", "second", "third", "person", "singular", "plural", "f*ck", "fick",
             "national", "international", "bestseller", "bestselling", "best", "seller",
-            // Common title words
             "between", "kingdoms", "two", "three", "four", "five", "before", "after",
             "under", "over", "within", "without", "beyond", "behind", "above", "below",
             "through", "across", "against", "toward", "towards", "into", "onto",
@@ -763,43 +406,38 @@ struct ScannerView: View {
             "road", "way", "place", "story", "book", "books", "notable", "review"
         ])
 
-        // Check if this looks like a name
         var allLookLikeNames = true
         var hasUppercasePattern = false
 
         for word in words {
             let cleanWord = word.trimmingCharacters(in: .punctuationCharacters)
 
-            // Skip if it's a common non-author word
             if notAuthorWords.contains(cleanWord.lowercased()) {
                 return false
             }
 
-            // Must be all letters
             if !cleanWord.allSatisfy({ $0.isLetter }) {
                 allLookLikeNames = false
             }
 
-            // Must be at least 2 characters
             if cleanWord.count < 2 {
                 return false
             }
 
-            // Check if it's ALL CAPS (common for author names on covers)
             if cleanWord == cleanWord.uppercased() && cleanWord.count > 2 {
                 hasUppercasePattern = true
             }
         }
 
-        // If all words are ALL CAPS and look like names, very likely an author
         if hasUppercasePattern && allLookLikeNames {
             return true
         }
 
-        // Otherwise require exactly 2-3 words that all look like proper names
         return allLookLikeNames && words.count >= 2 && words.count <= 3
     }
 }
+
+// MARK: - OCR Error
 
 enum OCRError: LocalizedError {
     case invalidImage
@@ -832,10 +470,8 @@ struct OCRResultsSheet: View {
                         Text("No books found for \"\(searchQuery)\"")
                     }
                 } else if let firstResult = viewModel.searchResults.first {
-                    // Show first result in full screen
                     ScrollView {
                         VStack(spacing: 24) {
-                            // Cover image
                             Group {
                                 if let coverURL = firstResult.coverURL {
                                     CachedAsyncImage(isbn: firstResult.isbn, coverURL: coverURL)
@@ -856,7 +492,6 @@ struct OCRResultsSheet: View {
                             }
                             .padding(.top, 20)
 
-                            // Book info
                             VStack(spacing: 8) {
                                 Text(firstResult.title)
                                     .font(.title2)
@@ -886,7 +521,6 @@ struct OCRResultsSheet: View {
                             }
                             .padding(.horizontal)
 
-                            // Action buttons
                             VStack(spacing: 12) {
                                 let isInShelf = viewModel.isBookInShelf(isbn: firstResult.isbn)
 
@@ -1071,14 +705,11 @@ struct CameraCaptureView: View {
 
     var body: some View {
         ZStack {
-            // Background
             Color.black.ignoresSafeArea()
 
-            // Camera preview
             CameraPreviewView(camera: camera)
                 .ignoresSafeArea()
 
-            // Loading overlay (shown while camera is starting)
             if !camera.isSessionRunning {
                 VStack(spacing: 16) {
                     ProgressView()
@@ -1090,9 +721,7 @@ struct CameraCaptureView: View {
                 }
             }
 
-            // Overlay UI
             VStack {
-                // Top bar with cancel button
                 HStack {
                     Button {
                         camera.stop()
@@ -1110,7 +739,6 @@ struct CameraCaptureView: View {
 
                 Spacer()
 
-                // Instructions (only show when camera is ready)
                 if camera.isSessionRunning {
                     Text("Point at book cover")
                         .font(.headline)
@@ -1122,7 +750,6 @@ struct CameraCaptureView: View {
 
                 Spacer()
 
-                // Capture button (only enabled when camera is ready)
                 Button {
                     camera.capturePhoto { image in
                         if let image = image {
@@ -1190,9 +817,7 @@ class CameraModel: NSObject, ObservableObject {
         session.beginConfiguration()
         session.sessionPreset = .photo
 
-        // Get the wide angle camera (1x)
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back) else {
-            print("No camera available")
             session.commitConfiguration()
             return
         }
@@ -1209,7 +834,6 @@ class CameraModel: NSObject, ObservableObject {
 
             session.commitConfiguration()
         } catch {
-            print("Camera setup error: \(error)")
             session.commitConfiguration()
         }
     }
@@ -1252,11 +876,8 @@ struct CameraPreviewView: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ uiView: PreviewView, context: Context) {
-        // Frame is handled automatically by PreviewView's layoutSubviews
-    }
+    func updateUIView(_ uiView: PreviewView, context: Context) {}
 
-    // Custom UIView subclass that properly handles the preview layer
     class PreviewView: UIView {
         override class var layerClass: AnyClass {
             AVCaptureVideoPreviewLayer.self
@@ -1394,11 +1015,3 @@ struct ManualISBNEntrySheet: View {
         }
     }
 }
-
-// MARK: - Previews
-
-#if DEBUG
-#Preview("Scanner") {
-    ScannerView(viewModel: BookshelfViewModel())
-}
-#endif

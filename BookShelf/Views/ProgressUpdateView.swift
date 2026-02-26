@@ -65,7 +65,7 @@ struct ProgressUpdateView: View {
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 8)
-                    .background(Color.orange, in: Capsule())
+                    .background(Color.accentColor, in: Capsule())
                     .transition(.scale.combined(with: .opacity))
                 }
 
@@ -152,9 +152,10 @@ struct ProgressUpdateView: View {
                         Text("+\(increment)")
                             .font(.subheadline)
                             .fontWeight(.semibold)
+                            .foregroundStyle(Color.accentColor)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 8)
-                            .background(Color(.systemGray5))
+                            .background(Color.accentColor.opacity(0.12))
                             .clipShape(Capsule())
                     }
                 }

@@ -6,6 +6,8 @@ struct BookshelfView: View {
     @State private var selectedBook: Book?
     @State private var showDeleteConfirmation = false
     @State private var bookToDelete: Book?
+    @State private var showAddBook = false
+    @State private var showStats = false
 
     private let columns = [
         GridItem(.adaptive(minimum: 120, maximum: 160), spacing: 16)
@@ -50,23 +52,69 @@ struct BookshelfView: View {
             } message: { book in
                 Text("Are you sure you want to remove \"\(book.title)\" from your shelf?")
             }
+            .overlay(alignment: .bottomTrailing) {
+                Button {
+                    showAddBook = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .frame(width: 56, height: 56)
+                        .background(Circle().fill(Color.accentColor))
+                        .shadow(color: Color.accentColor.opacity(0.35), radius: 8, x: 0, y: 4)
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 20)
+            }
+            .sheet(isPresented: $showAddBook) {
+                AddBookView(viewModel: viewModel)
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showStats = true
+                    } label: {
+                        Image(systemName: "chart.bar.fill")
+                    }
+                }
+            }
+            .sheet(isPresented: $showStats) {
+                StatsView(viewModel: viewModel)
+            }
         }
     }
 
     private var emptyStateView: some View {
-        ContentUnavailableView {
-            Label("No Books Yet", systemImage: "books.vertical")
-        } description: {
-            Text("Scan a book barcode or search to add books to your shelf")
+        VStack(spacing: 16) {
+            Image(systemName: "books.vertical")
+                .font(.system(size: 36))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 80, height: 80)
+                .background(Circle().fill(Color.accentColor.opacity(0.08)))
+
+            Text("No Books Yet")
+                .font(.title3)
+                .fontWeight(.semibold)
+
+            Text("Tap the + button to scan or search for books")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private var booksListView: some View {
         ScrollView {
             VStack(spacing: 24) {
+                StatsSummaryCard(viewModel: viewModel)
+                    .onTapGesture { showStats = true }
+
                 // Currently Reading section (shown first, most prominent)
                 if !currentlyReadingBooks.isEmpty {
-                    bookSection(title: "Currently Reading", books: currentlyReadingBooks)
+                    bookSection(title: "Reading", books: currentlyReadingBooks)
                 }
 
                 // Want to Read section
@@ -88,17 +136,22 @@ struct BookshelfView: View {
 
     private func bookSection(title: String, books: [Book]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            HStack {
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 2)
+                    .fill(Color.accentColor)
+                    .frame(width: 4, height: 22)
+
                 Text(title)
                     .font(.title2)
                     .fontWeight(.bold)
 
                 Text("\(books.count)")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.accentColor)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 2)
-                    .background(Color.secondary.opacity(0.2))
+                    .background(Color.accentColor.opacity(0.12))
                     .clipShape(Capsule())
             }
             .padding(.horizontal)
@@ -159,13 +212,14 @@ struct BookshelfView: View {
 
 struct BookGridItem: View {
     let book: Book
+    @State private var isPressed = false
 
     var body: some View {
         VStack(spacing: 8) {
             BookCoverView(coverData: book.coverImageData, title: book.title)
                 .frame(height: 160)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
-                .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
+                .shadow(color: .black.opacity(0.15), radius: 6, x: 0, y: 3)
 
             if book.readStatus == .currentlyReading, let progress = book.calculatedProgress {
                 ReadingProgressBar(progress: progress, height: 3)
@@ -192,6 +246,17 @@ struct BookGridItem: View {
                 }
             }
         }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(.systemBackground))
+                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+        )
+        .scaleEffect(isPressed ? 0.95 : 1.0)
+        .animation(.easeInOut(duration: 0.15), value: isPressed)
+        .onLongPressGesture(minimumDuration: .infinity, pressing: { pressing in
+            isPressed = pressing
+        }, perform: {})
         .frame(maxWidth: .infinity)
     }
 }

@@ -4,7 +4,7 @@ struct OnboardingView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var currentPage = 0
 
-    private let pageCount = 3
+    private let pageCount = 4
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,6 +44,18 @@ struct OnboardingView: View {
                     ]
                 )
                 .tag(2)
+
+                OnboardingPageView(
+                    icon: "chart.bar.fill",
+                    title: "Stats & Goals",
+                    subtitle: "Build a reading habit that sticks",
+                    features: [
+                        ("flame.fill", "Track reading streaks day by day"),
+                        ("target", "Set daily and weekly page goals"),
+                        ("leaf.fill", "Grow a garden as you finish books")
+                    ]
+                )
+                .tag(3)
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
             .animation(.easeInOut, value: currentPage)
@@ -62,8 +74,9 @@ struct OnboardingView: View {
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.accentColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
+                    .sensoryFeedback(.impact(flexibility: .soft), trigger: currentPage)
 
                     Button {
                         hasCompletedOnboarding = true
@@ -82,8 +95,9 @@ struct OnboardingView: View {
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.accentColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
+                    .sensoryFeedback(.success, trigger: hasCompletedOnboarding)
                 }
             }
             .padding(.horizontal, 24)
@@ -105,8 +119,10 @@ struct OnboardingPageView: View {
             Spacer()
 
             Image(systemName: icon)
-                .font(.system(size: 70))
+                .font(.system(size: 44))
                 .foregroundStyle(Color.accentColor)
+                .frame(width: 100, height: 100)
+                .background(Circle().fill(Color.accentColor.opacity(0.1)))
 
             VStack(spacing: 8) {
                 Text(title)
@@ -122,9 +138,10 @@ struct OnboardingPageView: View {
                 ForEach(features, id: \.text) { feature in
                     HStack(spacing: 12) {
                         Image(systemName: feature.icon)
-                            .font(.title3)
+                            .font(.body)
                             .foregroundStyle(Color.accentColor)
-                            .frame(width: 30)
+                            .frame(width: 36, height: 36)
+                            .background(Circle().fill(Color.accentColor.opacity(0.08)))
 
                         Text(feature.text)
                             .font(.body)
@@ -182,6 +199,19 @@ struct OnboardingPageView: View {
             ("book.closed", "Mark books as Want to Read"),
             ("book", "Track what you're Currently Reading"),
             ("star.fill", "Rate books you've finished reading")
+        ]
+    )
+}
+
+#Preview("Stats & Goals Page") {
+    OnboardingPageView(
+        icon: "chart.bar.fill",
+        title: "Stats & Goals",
+        subtitle: "Build a reading habit that sticks",
+        features: [
+            ("flame.fill", "Track reading streaks day by day"),
+            ("target", "Set daily and weekly page goals"),
+            ("leaf.fill", "Grow a garden as you finish books")
         ]
     )
 }
