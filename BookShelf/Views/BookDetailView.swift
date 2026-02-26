@@ -10,7 +10,7 @@ struct BookDetailView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     // Cover Image
-                    bookCover
+                    BookCoverView(coverData: book.coverImageData, title: book.title, cornerRadius: 12)
                         .frame(height: 280)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(color: .black.opacity(0.3), radius: 8, x: 0, y: 4)
@@ -168,25 +168,6 @@ struct BookDetailView: View {
                         Image(systemName: "trash")
                     }
                 }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var bookCover: some View {
-        if let data = book.coverImageData,
-           let uiImage = UIImage(data: data) {
-            Image(uiImage: uiImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-        } else {
-            ZStack {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.accentColor.opacity(0.1))
-
-                Image(systemName: "book.closed.fill")
-                    .font(.system(size: 60))
-                    .foregroundStyle(Color.accentColor)
             }
         }
     }

@@ -1,8 +1,6 @@
 import SwiftUI
-import SwiftData
 
 struct BookshelfView: View {
-    @Environment(\.modelContext) private var modelContext
     @Bindable var viewModel: BookshelfViewModel
 
     @State private var selectedBook: Book?
@@ -28,16 +26,15 @@ struct BookshelfView: View {
     var body: some View {
         NavigationStack {
             Group {
-                if viewModel.books.isEmpty {
+                if !viewModel.isInitialized {
+                    ProgressView()
+                } else if viewModel.books.isEmpty {
                     emptyStateView
                 } else {
                     booksListView
                 }
             }
             .navigationTitle("Bookshelf")
-            .onAppear {
-                viewModel.setModelContext(modelContext)
-            }
             .sheet(item: $selectedBook) { book in
                 BookDetailView(book: book, viewModel: viewModel)
             }
@@ -165,7 +162,7 @@ struct BookGridItem: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            bookCover
+            BookCoverView(coverData: book.coverImageData, title: book.title)
                 .frame(height: 160)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
                 .shadow(color: .black.opacity(0.2), radius: 4, x: 0, y: 2)
@@ -192,34 +189,6 @@ struct BookGridItem: View {
             }
         }
         .frame(maxWidth: .infinity)
-    }
-
-    @ViewBuilder
-    private var bookCover: some View {
-        if let data = book.coverImageData,
-           let uiImage = UIImage(data: data) {
-            Image(uiImage: uiImage)
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-        } else {
-            ZStack {
-                RoundedRectangle(cornerRadius: 8)
-                    .fill(Color.accentColor.opacity(0.1))
-
-                VStack {
-                    Image(systemName: "book.closed.fill")
-                        .font(.largeTitle)
-                        .foregroundStyle(Color.accentColor)
-
-                    Text(book.title)
-                        .font(.caption2)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 4)
-                        .lineLimit(3)
-                }
-                .padding(8)
-            }
-        }
     }
 }
 

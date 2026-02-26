@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 import Testing
 @testable import BookShelf
 
@@ -205,6 +206,49 @@ struct PreviewSampleDataTests {
             #expect(!result.title.isEmpty)
             #expect(!result.authors.isEmpty)
         }
+    }
+}
+
+// MARK: - BookshelfViewModel Tests
+
+@Suite("BookshelfViewModel")
+struct BookshelfViewModelTests {
+    @Test("isInitialized defaults to false")
+    @MainActor
+    func defaultIsInitialized() {
+        let vm = BookshelfViewModel()
+        #expect(vm.isInitialized == false)
+    }
+
+    @Test("isInitialized becomes true after setModelContext")
+    @MainActor
+    func isInitializedAfterSetModelContext() throws {
+        let vm = BookshelfViewModel()
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Book.self, configurations: config)
+        vm.setModelContext(container.mainContext)
+        #expect(vm.isInitialized == true)
+    }
+
+    @Test("books is empty before setModelContext")
+    @MainActor
+    func booksEmptyBeforeInit() {
+        let vm = BookshelfViewModel()
+        #expect(vm.books.isEmpty)
+    }
+
+    @Test("fetchBooks loads books after setModelContext")
+    @MainActor
+    func fetchBooksLoadsData() throws {
+        let vm = BookshelfViewModel()
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let container = try ModelContainer(for: Book.self, configurations: config)
+        let context = container.mainContext
+        context.insert(Book(isbn: "111", title: "Book A"))
+        try context.save()
+        vm.setModelContext(context)
+        #expect(vm.books.count == 1)
+        #expect(vm.books.first?.title == "Book A")
     }
 }
 

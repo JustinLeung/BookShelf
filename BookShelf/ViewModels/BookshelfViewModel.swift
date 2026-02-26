@@ -10,12 +10,14 @@ class BookshelfViewModel {
     var isLoading = false
     var errorMessage: String?
     var showError = false
+    private(set) var isInitialized = false
 
     private var modelContext: ModelContext?
 
     func setModelContext(_ context: ModelContext) {
         self.modelContext = context
         fetchBooks()
+        isInitialized = true
     }
 
     func fetchBooks() {

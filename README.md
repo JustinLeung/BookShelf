@@ -14,6 +14,7 @@ An iOS app that lets you scan book covers and barcodes to build a personal readi
 - **Book Details** — View cover art, author, publisher, page count, and description
 - **Quick Links** — Jump directly to Amazon or Audible to purchase a book
 - **Image Caching** — Two-tier caching system (in-memory + disk) for cover images
+- **Startup Performance** — Loading state prevents empty-state flash, async off-main-thread cover image decoding for smooth scrolling, and deduplicated database fetches on launch
 - **SwiftUI Previews** — Named preview variants with sample data for every view, covering populated/empty states, read statuses, ratings, and reusable components
 
 ## Tech Stack
@@ -45,6 +46,7 @@ BookShelf/
 │   ├── ContentView.swift        # Tab navigation
 │   ├── BookshelfView.swift      # Main library grid
 │   ├── BookDetailView.swift     # Book details & status toggle
+│   ├── BookCoverView.swift      # Async off-main-thread cover image decoding
 │   ├── StarRatingView.swift     # Interactive 1-5 star rating
 │   ├── ScannerView.swift        # Barcode & OCR scanning
 │   └── ManualSearchView.swift   # Search by ISBN or title
@@ -65,6 +67,7 @@ Every view includes named `#Preview` variants with sample data, wrapped in `#if 
 | ContentView | With Books, Empty |
 | BookshelfView | Populated, Empty, Grid Item variants |
 | BookDetailView | Want to Read, Currently Reading, Read (rated/unrated), DetailSection, DetailRow |
+| BookCoverView | With Cover Data, Placeholder (Grid), Placeholder (Detail) |
 | StarRatingView | 5 Stars, 3 Stars, No Rating, Interactive |
 | ManualSearchView | Empty, Search Result Row, Search Result Row (in shelf) |
 | ScannerView | Scanner landing page |

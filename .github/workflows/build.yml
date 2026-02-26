@@ -16,7 +16,12 @@ jobs:
         run: sudo xcode-select -s /Applications/Xcode_16.2.app/Contents/Developer
 
       - name: Install iOS Simulator
-        run: xcodebuild -downloadPlatform iOS
+        run: |
+          if xcrun simctl list runtimes | grep -q 'iOS'; then
+            echo "iOS Simulator runtime already available"
+          else
+            xcodebuild -downloadPlatform iOS
+          fi
 
       - name: Build
         run: |
