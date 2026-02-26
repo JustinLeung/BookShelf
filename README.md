@@ -66,7 +66,7 @@ Every view includes named `#Preview` variants with sample data, wrapped in `#if 
 
 | View | Previews |
 |------|----------|
-| OnboardingView | Onboarding Flow, Welcome Page |
+| OnboardingView | Onboarding Flow, Welcome Page, Add Books Page, Track Reading Page |
 | ContentView | With Books, Empty |
 | BookshelfView | Populated, Empty, Grid Item variants |
 | BookDetailView | Want to Read, Currently Reading, Read (rated/unrated), DetailSection, DetailRow |
