@@ -24,3 +24,28 @@ struct StarRatingView: View {
         }
     }
 }
+
+#if DEBUG
+#Preview("5 Stars") {
+    StarRatingView(rating: 5, interactive: false)
+        .padding()
+}
+
+#Preview("3 Stars") {
+    StarRatingView(rating: 3, interactive: false)
+        .padding()
+}
+
+#Preview("No Rating") {
+    StarRatingView(rating: nil, interactive: false)
+        .padding()
+}
+
+#Preview("Interactive") {
+    @Previewable @State var rating: Int? = 2
+    StarRatingView(rating: rating, interactive: true, starSize: 32) { newRating in
+        rating = newRating
+    }
+    .padding()
+}
+#endif

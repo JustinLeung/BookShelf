@@ -1394,3 +1394,11 @@ struct ManualISBNEntrySheet: View {
         }
     }
 }
+
+// MARK: - Previews
+
+#if DEBUG
+#Preview("Scanner") {
+    ScannerView(viewModel: BookshelfViewModel())
+}
+#endif

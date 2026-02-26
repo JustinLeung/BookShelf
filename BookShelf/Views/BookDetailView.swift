@@ -229,3 +229,35 @@ struct DetailRow: View {
         .font(.subheadline)
     }
 }
+
+// MARK: - Previews
+
+#if DEBUG
+#Preview("Want to Read") {
+    BookDetailView(book: .sampleWantToRead, viewModel: BookshelfViewModel())
+}
+
+#Preview("Currently Reading") {
+    BookDetailView(book: .sampleCurrentlyReading, viewModel: BookshelfViewModel())
+}
+
+#Preview("Read with Rating") {
+    BookDetailView(book: .sampleReadWithRating, viewModel: BookshelfViewModel())
+}
+
+#Preview("Read without Rating") {
+    BookDetailView(book: .sampleReadNoRating, viewModel: BookshelfViewModel())
+}
+
+#Preview("Detail Section") {
+    DetailSection(title: "Description") {
+        Text("A sample description of a book that spans multiple lines to show how the section looks with longer content.")
+    }
+    .padding()
+}
+
+#Preview("Detail Row") {
+    DetailRow(label: "Publisher", value: "Harper Perennial")
+        .padding()
+}
+#endif

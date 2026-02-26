@@ -222,3 +222,35 @@ struct BookGridItem: View {
         }
     }
 }
+
+// MARK: - Previews
+
+#if DEBUG
+#Preview("Populated Bookshelf") {
+    BookshelfView(viewModel: BookshelfViewModel())
+        .modelContainer(Book.previewContainer)
+}
+
+#Preview("Empty Bookshelf") {
+    BookshelfView(viewModel: BookshelfViewModel())
+        .modelContainer(for: Book.self, inMemory: true)
+}
+
+#Preview("Book Grid Item - No Cover") {
+    BookGridItem(book: .sampleWantToRead)
+        .frame(width: 140)
+        .padding()
+}
+
+#Preview("Book Grid Item - With Rating") {
+    BookGridItem(book: .sampleReadWithRating)
+        .frame(width: 140)
+        .padding()
+}
+
+#Preview("Book Grid Item - Long Title") {
+    BookGridItem(book: .sampleLongTitle)
+        .frame(width: 140)
+        .padding()
+}
+#endif

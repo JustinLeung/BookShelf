@@ -174,3 +174,27 @@ struct SearchResultRow: View {
         .padding(.vertical, 4)
     }
 }
+
+// MARK: - Previews
+
+#if DEBUG
+#Preview("Search - Empty") {
+    ManualSearchView(viewModel: BookshelfViewModel())
+}
+
+#Preview("Search Result Row") {
+    SearchResultRow(
+        result: BookSearchResult.sampleResults[0],
+        isInShelf: false
+    ) {}
+    .padding()
+}
+
+#Preview("Search Result Row - In Shelf") {
+    SearchResultRow(
+        result: BookSearchResult.sampleResults[0],
+        isInShelf: true
+    ) {}
+    .padding()
+}
+#endif

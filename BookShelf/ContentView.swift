@@ -32,7 +32,14 @@ struct ContentView: View {
     }
 }
 
-#Preview {
+#if DEBUG
+#Preview("With Books") {
+    ContentView()
+        .modelContainer(Book.previewContainer)
+}
+
+#Preview("Empty") {
     ContentView()
         .modelContainer(for: Book.self, inMemory: true)
 }
+#endif
