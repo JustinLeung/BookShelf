@@ -109,6 +109,7 @@ class BookshelfViewModel {
     func deleteBook(_ book: Book) {
         guard let modelContext else { return }
 
+        deleteProgressEntries(for: book.isbn)
         modelContext.delete(book)
 
         do {
@@ -163,6 +164,7 @@ class BookshelfViewModel {
         if status == .wantToRead {
             book.currentPage = nil
             book.progressPercentage = nil
+            deleteProgressEntries(for: book.isbn)
         }
 
         // Set progress to 100% when marking as read
@@ -211,16 +213,25 @@ class BookshelfViewModel {
     func updateProgress(_ book: Book, page: Int?, percentage: Double?) {
         guard let modelContext else { return }
 
+        var clampedPage: Int?
         if let page {
-            let clampedPage = max(0, book.pageCount.map { min(page, $0) } ?? page)
+            clampedPage = max(0, book.pageCount.map { min(page, $0) } ?? page)
             book.currentPage = clampedPage
             if let pageCount = book.pageCount, pageCount > 0 {
-                book.progressPercentage = Double(clampedPage) / Double(pageCount)
+                book.progressPercentage = Double(clampedPage!) / Double(pageCount)
             }
         } else if let percentage {
             book.progressPercentage = min(1.0, max(0.0, percentage))
             book.currentPage = nil
         }
+
+        // Record a progress entry
+        let entry = ReadingProgressEntry(
+            bookISBN: book.isbn,
+            page: clampedPage,
+            percentage: percentage
+        )
+        modelContext.insert(entry)
 
         do {
             try modelContext.save()
@@ -245,6 +256,54 @@ class BookshelfViewModel {
             fetchBooks()
         } catch {
             showError(message: "Failed to update rating: \(error.localizedDescription)")
+        }
+    }
+
+    func fetchReadingSessions(for isbn: String) -> [ReadingProgressEntry] {
+        guard let modelContext else { return [] }
+
+        let descriptor = FetchDescriptor<ReadingProgressEntry>(
+            predicate: #Predicate { $0.bookISBN == isbn },
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            return []
+        }
+    }
+
+    func readingPace(for isbn: String) -> Double? {
+        let sessions = fetchReadingSessions(for: isbn)
+        guard sessions.count >= 2 else { return nil }
+
+        // Sessions are newest-first; oldest is last
+        guard let newest = sessions.first,
+              let oldest = sessions.last,
+              let newestPage = newest.page,
+              let oldestPage = oldest.page else { return nil }
+
+        let totalPages = newestPage - oldestPage
+        guard totalPages > 0 else { return nil }
+
+        let days = Calendar.current.dateComponents([.day], from: oldest.timestamp, to: newest.timestamp).day ?? 0
+        guard days > 0 else { return Double(totalPages) }
+
+        return Double(totalPages) / Double(days)
+    }
+
+    private func deleteProgressEntries(for isbn: String) {
+        guard let modelContext else { return }
+
+        let descriptor = FetchDescriptor<ReadingProgressEntry>(
+            predicate: #Predicate { $0.bookISBN == isbn }
+        )
+
+        if let entries = try? modelContext.fetch(descriptor) {
+            for entry in entries {
+                modelContext.delete(entry)
+            }
         }
     }
 

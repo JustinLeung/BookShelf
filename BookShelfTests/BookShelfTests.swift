@@ -126,17 +126,66 @@ struct ReadingProgressTests {
     }
 }
 
+// MARK: - ReadingProgressEntry Tests
+
+@Suite("ReadingProgressEntry")
+struct ReadingProgressEntryTests {
+    @Test("pagesRead returns diff when both have pages")
+    func pagesReadDiff() {
+        let current = ReadingProgressEntry(bookISBN: "111", page: 100)
+        let previous = ReadingProgressEntry(bookISBN: "111", page: 75)
+        #expect(current.pagesRead(since: previous) == 25)
+    }
+
+    @Test("pagesRead returns nil when current has no page")
+    func pagesReadNilCurrentPage() {
+        let current = ReadingProgressEntry(bookISBN: "111", page: nil)
+        let previous = ReadingProgressEntry(bookISBN: "111", page: 75)
+        #expect(current.pagesRead(since: previous) == nil)
+    }
+
+    @Test("pagesRead returns currentPage when previous is nil")
+    func pagesReadNoPrevious() {
+        let current = ReadingProgressEntry(bookISBN: "111", page: 50)
+        #expect(current.pagesRead(since: nil) == 50)
+    }
+
+    @Test("pagesRead returns nil when diff is zero or negative")
+    func pagesReadNoDiff() {
+        let current = ReadingProgressEntry(bookISBN: "111", page: 50)
+        let previous = ReadingProgressEntry(bookISBN: "111", page: 50)
+        #expect(current.pagesRead(since: previous) == nil)
+
+        let earlier = ReadingProgressEntry(bookISBN: "111", page: 75)
+        #expect(current.pagesRead(since: earlier) == nil)
+    }
+
+    @Test("default timestamp is set automatically")
+    func defaultTimestamp() {
+        let before = Date()
+        let entry = ReadingProgressEntry(bookISBN: "111", page: 10)
+        let after = Date()
+        #expect(entry.timestamp >= before)
+        #expect(entry.timestamp <= after)
+    }
+}
+
 // MARK: - Reading Progress ViewModel Tests
 
 @Suite("ReadingProgressViewModel")
 struct ReadingProgressViewModelTests {
+    @MainActor private static func makeContext() throws -> ModelContext {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let schema = Schema([Book.self, ReadingProgressEntry.self])
+        let container = try ModelContainer(for: schema, configurations: config)
+        return container.mainContext
+    }
+
     @Test("progress clears when status changes to wantToRead")
     @MainActor
     func progressClearsOnWantToRead() throws {
         let vm = BookshelfViewModel()
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: Book.self, configurations: config)
-        let context = container.mainContext
+        let context = try Self.makeContext()
         let book = Book(isbn: "111", title: "Test", pageCount: 200, readStatus: .currentlyReading, currentPage: 100, progressPercentage: 0.5)
         context.insert(book)
         try context.save()
@@ -152,9 +201,7 @@ struct ReadingProgressViewModelTests {
     @MainActor
     func progressSetsTo100OnRead() throws {
         let vm = BookshelfViewModel()
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: Book.self, configurations: config)
-        let context = container.mainContext
+        let context = try Self.makeContext()
         let book = Book(isbn: "111", title: "Test", pageCount: 200, readStatus: .currentlyReading, currentPage: 100)
         context.insert(book)
         try context.save()
@@ -170,9 +217,7 @@ struct ReadingProgressViewModelTests {
     @MainActor
     func updateProgressClampsPage() throws {
         let vm = BookshelfViewModel()
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: Book.self, configurations: config)
-        let context = container.mainContext
+        let context = try Self.makeContext()
         let book = Book(isbn: "111", title: "Test", pageCount: 200, readStatus: .currentlyReading)
         context.insert(book)
         try context.save()
@@ -187,9 +232,7 @@ struct ReadingProgressViewModelTests {
     @MainActor
     func updateProgressClampsNegativePage() throws {
         let vm = BookshelfViewModel()
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: Book.self, configurations: config)
-        let context = container.mainContext
+        let context = try Self.makeContext()
         let book = Book(isbn: "111", title: "Test", pageCount: 200, readStatus: .currentlyReading)
         context.insert(book)
         try context.save()
@@ -204,9 +247,7 @@ struct ReadingProgressViewModelTests {
     @MainActor
     func updateProgressSetsPercentage() throws {
         let vm = BookshelfViewModel()
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: Book.self, configurations: config)
-        let context = container.mainContext
+        let context = try Self.makeContext()
         let book = Book(isbn: "111", title: "Test", readStatus: .currentlyReading)
         context.insert(book)
         try context.save()
@@ -216,6 +257,163 @@ struct ReadingProgressViewModelTests {
 
         #expect(book.progressPercentage == 0.65)
         #expect(book.currentPage == nil)
+    }
+}
+
+// MARK: - ReadingProgressEntry Creation Tests
+
+@Suite("ReadingProgressEntryCreation")
+struct ReadingProgressEntryCreationTests {
+    @MainActor private static func makeContext() throws -> ModelContext {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let schema = Schema([Book.self, ReadingProgressEntry.self])
+        let container = try ModelContainer(for: schema, configurations: config)
+        return container.mainContext
+    }
+
+    @Test("updateProgress creates a ReadingProgressEntry")
+    @MainActor
+    func entryCreatedOnUpdate() throws {
+        let vm = BookshelfViewModel()
+        let context = try Self.makeContext()
+        let book = Book(isbn: "222", title: "Test", pageCount: 300, readStatus: .currentlyReading)
+        context.insert(book)
+        try context.save()
+        vm.setModelContext(context)
+
+        vm.updateProgress(book, page: 50, percentage: nil)
+
+        let sessions = vm.fetchReadingSessions(for: "222")
+        #expect(sessions.count == 1)
+        #expect(sessions.first?.page == 50)
+        #expect(sessions.first?.bookISBN == "222")
+    }
+
+    @Test("multiple updateProgress calls create multiple entries")
+    @MainActor
+    func multipleEntries() throws {
+        let vm = BookshelfViewModel()
+        let context = try Self.makeContext()
+        let book = Book(isbn: "333", title: "Test", pageCount: 300, readStatus: .currentlyReading)
+        context.insert(book)
+        try context.save()
+        vm.setModelContext(context)
+
+        vm.updateProgress(book, page: 30, percentage: nil)
+        vm.updateProgress(book, page: 60, percentage: nil)
+        vm.updateProgress(book, page: 90, percentage: nil)
+
+        let sessions = vm.fetchReadingSessions(for: "333")
+        #expect(sessions.count == 3)
+    }
+
+    @Test("entries cleared when status changes to wantToRead")
+    @MainActor
+    func entriesClearedOnWantToRead() throws {
+        let vm = BookshelfViewModel()
+        let context = try Self.makeContext()
+        let book = Book(isbn: "444", title: "Test", pageCount: 300, readStatus: .currentlyReading)
+        context.insert(book)
+        try context.save()
+        vm.setModelContext(context)
+
+        vm.updateProgress(book, page: 50, percentage: nil)
+        vm.updateProgress(book, page: 100, percentage: nil)
+
+        vm.setReadStatus(book, status: .wantToRead)
+
+        let sessions = vm.fetchReadingSessions(for: "444")
+        #expect(sessions.isEmpty)
+    }
+}
+
+// MARK: - Reading Pace Tests
+
+@Suite("ReadingPace")
+struct ReadingPaceTests {
+    @MainActor private static func makeContext() throws -> ModelContext {
+        let config = ModelConfiguration(isStoredInMemoryOnly: true)
+        let schema = Schema([Book.self, ReadingProgressEntry.self])
+        let container = try ModelContainer(for: schema, configurations: config)
+        return container.mainContext
+    }
+
+    @Test("readingPace returns nil with fewer than 2 sessions")
+    @MainActor
+    func paceNilWithFewSessions() throws {
+        let vm = BookshelfViewModel()
+        let context = try Self.makeContext()
+        let book = Book(isbn: "555", title: "Test", pageCount: 300, readStatus: .currentlyReading)
+        context.insert(book)
+        try context.save()
+        vm.setModelContext(context)
+
+        #expect(vm.readingPace(for: "555") == nil)
+
+        vm.updateProgress(book, page: 50, percentage: nil)
+
+        #expect(vm.readingPace(for: "555") == nil)
+    }
+
+    @Test("readingPace calculates correctly")
+    @MainActor
+    func paceCalculation() throws {
+        let vm = BookshelfViewModel()
+        let context = try Self.makeContext()
+        let book = Book(isbn: "666", title: "Test", pageCount: 300, readStatus: .currentlyReading)
+        context.insert(book)
+        try context.save()
+        vm.setModelContext(context)
+
+        let calendar = Calendar.current
+        let now = Date()
+        let entry1 = ReadingProgressEntry(
+            bookISBN: "666",
+            page: 20,
+            timestamp: calendar.date(byAdding: .day, value: -10, to: now)!
+        )
+        let entry2 = ReadingProgressEntry(
+            bookISBN: "666",
+            page: 120,
+            timestamp: now
+        )
+        context.insert(entry1)
+        context.insert(entry2)
+        try context.save()
+
+        let pace = vm.readingPace(for: "666")
+        #expect(pace != nil)
+        // 100 pages over 10 days = 10 pages/day
+        #expect(pace == 10.0)
+    }
+
+    @Test("fetchReadingSessions returns newest first")
+    @MainActor
+    func sessionsNewestFirst() throws {
+        let vm = BookshelfViewModel()
+        let context = try Self.makeContext()
+        vm.setModelContext(context)
+
+        let calendar = Calendar.current
+        let now = Date()
+        let entry1 = ReadingProgressEntry(
+            bookISBN: "777",
+            page: 10,
+            timestamp: calendar.date(byAdding: .day, value: -5, to: now)!
+        )
+        let entry2 = ReadingProgressEntry(
+            bookISBN: "777",
+            page: 50,
+            timestamp: now
+        )
+        context.insert(entry1)
+        context.insert(entry2)
+        try context.save()
+
+        let sessions = vm.fetchReadingSessions(for: "777")
+        #expect(sessions.count == 2)
+        #expect(sessions.first?.page == 50)
+        #expect(sessions.last?.page == 10)
     }
 }
 
@@ -381,7 +579,8 @@ struct BookshelfViewModelTests {
     func isInitializedAfterSetModelContext() throws {
         let vm = BookshelfViewModel()
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: Book.self, configurations: config)
+        let schema = Schema([Book.self, ReadingProgressEntry.self])
+        let container = try ModelContainer(for: schema, configurations: config)
         vm.setModelContext(container.mainContext)
         #expect(vm.isInitialized == true)
     }
@@ -398,7 +597,8 @@ struct BookshelfViewModelTests {
     func fetchBooksLoadsData() throws {
         let vm = BookshelfViewModel()
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let container = try ModelContainer(for: Book.self, configurations: config)
+        let schema = Schema([Book.self, ReadingProgressEntry.self])
+        let container = try ModelContainer(for: schema, configurations: config)
         let context = container.mainContext
         context.insert(Book(isbn: "111", title: "Book A"))
         try context.save()

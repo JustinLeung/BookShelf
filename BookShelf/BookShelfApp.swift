@@ -5,7 +5,8 @@ import SwiftData
 struct BookShelfApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Book.self
+            Book.self,
+            ReadingProgressEntry.self
         ])
         let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
 

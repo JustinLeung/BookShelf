@@ -5,6 +5,8 @@ struct BookDetailView: View {
     @Bindable var viewModel: BookshelfViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showProgressUpdate = false
+    @State private var readingSessions: [ReadingProgressEntry] = []
+    @State private var readingPace: Double?
 
     var body: some View {
         NavigationStack {
@@ -52,22 +54,82 @@ struct BookDetailView: View {
 
                     // Reading Progress (only for currently reading)
                     if book.readStatus == .currentlyReading {
-                        VStack(spacing: 12) {
+                        VStack(spacing: 16) {
+                            // Compact ring + stats side-by-side
                             if let progress = book.calculatedProgress {
-                                HStack {
-                                    if let page = book.currentPage, let total = book.pageCount {
-                                        Text("Page \(page) of \(total)")
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    Text("\(Int(progress * 100))%")
-                                        .font(.subheadline)
-                                        .fontWeight(.medium)
-                                        .foregroundStyle(.secondary)
-                                }
+                                HStack(spacing: 20) {
+                                    CircularProgressRing(
+                                        progress: progress,
+                                        size: 80,
+                                        lineWidth: 6,
+                                        showPercentage: true
+                                    )
 
-                                ReadingProgressBar(progress: progress, height: 8)
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        if let page = book.currentPage, let total = book.pageCount {
+                                            Text("Page \(page) of \(total)")
+                                                .font(.subheadline)
+                                                .foregroundStyle(.secondary)
+                                        }
+
+                                        if let pace = readingPace {
+                                            Text("~\(Int(pace)) pages/day")
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                        }
+
+                                        if let pace = readingPace,
+                                           let current = book.currentPage,
+                                           let total = book.pageCount,
+                                           pace > 0 {
+                                            let remaining = total - current
+                                            let daysLeft = Int(ceil(Double(remaining) / pace))
+                                            Text("~\(daysLeft) days left")
+                                                .font(.caption)
+                                                .foregroundStyle(.orange)
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Recent sessions
+                            if !readingSessions.isEmpty {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text("Recent Sessions")
+                                        .font(.caption)
+                                        .fontWeight(.semibold)
+                                        .foregroundStyle(.secondary)
+
+                                    ForEach(Array(readingSessions.prefix(5).enumerated()), id: \.offset) { index, session in
+                                        HStack {
+                                            Text(session.timestamp.formatted(date: .abbreviated, time: .omitted))
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+
+                                            Spacer()
+
+                                            if let page = session.page {
+                                                Text("p. \(page)")
+                                                    .font(.caption)
+                                                    .fontWeight(.medium)
+                                            }
+
+                                            let nextSession = index + 1 < readingSessions.count ? readingSessions[index + 1] : nil
+                                            if let pagesRead = session.pagesRead(since: nextSession) {
+                                                Text("+\(pagesRead)")
+                                                    .font(.caption2)
+                                                    .fontWeight(.semibold)
+                                                    .foregroundStyle(.white)
+                                                    .padding(.horizontal, 8)
+                                                    .padding(.vertical, 2)
+                                                    .background(Color.orange, in: Capsule())
+                                            }
+                                        }
+                                    }
+                                }
+                                .padding()
+                                .background(Color(.systemGray6))
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
 
                             Button {
@@ -86,9 +148,17 @@ struct BookDetailView: View {
                             }
                         }
                         .padding(.horizontal)
+                        .task {
+                            loadSessions()
+                        }
                         .sheet(isPresented: $showProgressUpdate) {
-                            ProgressUpdateView(book: book) { page, percentage in
+                            ProgressUpdateView(
+                                book: book,
+                                previousPage: readingSessions.first?.page,
+                                readingPace: readingPace
+                            ) { page, percentage in
                                 viewModel.updateProgress(book, page: page, percentage: percentage)
+                                loadSessions()
                             }
                         }
                     }
@@ -214,6 +284,11 @@ struct BookDetailView: View {
                 }
             }
         }
+    }
+
+    private func loadSessions() {
+        readingSessions = viewModel.fetchReadingSessions(for: book.isbn)
+        readingPace = viewModel.readingPace(for: book.isbn)
     }
 }
 

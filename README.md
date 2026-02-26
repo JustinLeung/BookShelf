@@ -11,7 +11,7 @@ An iOS app that lets you scan book covers and barcodes to build a personal readi
 - **Smart Book Search** — Multi-strategy search that queries Google Books API with precise operators, falls back to Open Library, and ranks results by relevance
 - **Reading List** — Track books as "Want to Read", "Currently Reading", or "Read" with on-device persistence via SwiftData
 - **Star Ratings** — Rate books you've read on a 1–5 star scale
-- **Reading Progress** — Track current page with a visual progress bar; automatically tracks start and finish dates and calculates days to read
+- **Reading Progress** — Track current page with a circular progress ring, quick-increment buttons with haptics, reading session history, pace tracking (~pages/day), and estimated completion
 - **Book Details** — View cover art, author, publisher, page count, and description
 - **Quick Links** — Jump directly to Amazon or Audible to purchase a book
 - **Image Caching** — Two-tier caching system (in-memory + disk) for cover images
@@ -42,7 +42,8 @@ An iOS app that lets you scan book covers and barcodes to build a personal readi
 ```
 BookShelf/
 ├── Models/
-│   └── Book.swift               # SwiftData model
+│   ├── Book.swift               # SwiftData model
+│   └── ReadingProgressEntry.swift # Reading session history model
 ├── Views/
 │   ├── ContentView.swift        # Tab navigation
 │   ├── OnboardingView.swift     # First-launch onboarding flow
@@ -50,7 +51,8 @@ BookShelf/
 │   ├── BookDetailView.swift     # Book details & status toggle
 │   ├── BookCoverView.swift      # Async off-main-thread cover image decoding
 │   ├── StarRatingView.swift     # Interactive 1-5 star rating
-│   ├── ReadingProgressBar.swift # Reusable progress bar component
+│   ├── CircularProgressRing.swift # Animated circular progress ring
+│   ├── ReadingProgressBar.swift # Thin progress bar for grid items
 │   ├── ProgressUpdateView.swift # Sheet for updating reading progress
 │   ├── ScannerView.swift        # Barcode & OCR scanning
 │   └── ManualSearchView.swift   # Search by ISBN or title
@@ -74,6 +76,7 @@ Every view includes named `#Preview` variants with sample data, wrapped in `#if 
 | BookDetailView | Want to Read, Currently Reading, Read (rated/unrated), DetailSection, DetailRow |
 | BookCoverView | With Cover Data, Placeholder (Grid), Placeholder (Detail) |
 | StarRatingView | 5 Stars, 3 Stars, No Rating, Interactive |
+| CircularProgressRing | 0%, 38%, 75%, 100%, Compact |
 | ReadingProgressBar | 0%, 38%, 75%, 100% |
 | ProgressUpdateView | With Page Count, Without Page Count |
 | ManualSearchView | Empty, Search Result Row, Search Result Row (in shelf) |
