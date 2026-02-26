@@ -60,17 +60,41 @@ struct ManualSearchView: View {
                     ProgressView("Searching...")
                     Spacer()
                 } else if viewModel.searchResults.isEmpty && !searchText.isEmpty {
-                    ContentUnavailableView {
-                        Label("No Results", systemImage: "magnifyingglass")
-                    } description: {
+                    VStack(spacing: 16) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 32))
+                            .foregroundStyle(Color.accentColor)
+                            .frame(width: 72, height: 72)
+                            .background(Circle().fill(Color.accentColor.opacity(0.08)))
+
+                        Text("No Results")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+
                         Text("Try a different search term")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else if viewModel.searchResults.isEmpty {
-                    ContentUnavailableView {
-                        Label("Search for Books", systemImage: "text.book.closed")
-                    } description: {
+                    VStack(spacing: 16) {
+                        Image(systemName: "text.book.closed")
+                            .font(.system(size: 32))
+                            .foregroundStyle(Color.accentColor)
+                            .frame(width: 72, height: 72)
+                            .background(Circle().fill(Color.accentColor.opacity(0.08)))
+
+                        Text("Search for Books")
+                            .font(.title3)
+                            .fontWeight(.semibold)
+
                         Text("Enter an ISBN or search by title to find books")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal, 40)
                     }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                 } else {
                     searchResultsList
                 }
@@ -122,15 +146,29 @@ struct SearchResultRow: View {
             if let coverURL = result.coverURL {
                 CachedAsyncImage(isbn: result.isbn, coverURL: coverURL)
                     .frame(width: 50, height: 70)
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 1)
             } else {
-                RoundedRectangle(cornerRadius: 4)
-                    .fill(Color.gray.opacity(0.2))
-                    .frame(width: 50, height: 70)
-                    .overlay {
-                        Image(systemName: "book.closed")
-                            .foregroundStyle(.gray)
-                    }
+                ZStack(alignment: .leading) {
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(
+                            LinearGradient(
+                                colors: [Color.accentColor.opacity(0.18), Color.accentColor.opacity(0.08)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 50, height: 70)
+
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(Color.accentColor.opacity(0.2))
+                        .frame(width: 2, height: 70)
+
+                    Image(systemName: "book.closed")
+                        .foregroundStyle(Color.accentColor.opacity(0.5))
+                        .frame(width: 50, height: 70)
+                }
+                .shadow(color: .black.opacity(0.1), radius: 3, x: 0, y: 1)
             }
 
             // Book info
@@ -169,6 +207,7 @@ struct SearchResultRow: View {
                         .font(.title2)
                 }
                 .buttonStyle(.plain)
+                .sensoryFeedback(.impact(flexibility: .soft), trigger: isInShelf)
             }
         }
         .padding(.vertical, 4)

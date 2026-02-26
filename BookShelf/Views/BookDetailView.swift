@@ -44,13 +44,19 @@ struct BookDetailView: View {
                                 .fontWeight(.medium)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
-                                .background(book.readStatus == status ? Color.accentColor : Color(.systemGray5))
+                                .background(book.readStatus == status ? Color.accentColor : Color(.systemGray6))
                                 .foregroundStyle(book.readStatus == status ? .white : .primary)
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 10)
+                                        .stroke(Color(.systemGray4), lineWidth: book.readStatus == status ? 0 : 0.5)
+                                )
                             }
                         }
                     }
                     .padding(.horizontal)
+                    .sensoryFeedback(.impact(flexibility: .soft), trigger: book.readStatus)
+                    .animation(.easeInOut(duration: 0.2), value: book.readStatus)
 
                     // Reading Progress (only for currently reading)
                     if book.readStatus == .currentlyReading {
@@ -86,7 +92,7 @@ struct BookDetailView: View {
                                             let daysLeft = Int(ceil(Double(remaining) / pace))
                                             Text("~\(daysLeft) days left")
                                                 .font(.caption)
-                                                .foregroundStyle(.orange)
+                                                .foregroundStyle(Color.accentColor)
                                         }
                                     }
                                 }
@@ -122,7 +128,7 @@ struct BookDetailView: View {
                                                     .foregroundStyle(.white)
                                                     .padding(.horizontal, 8)
                                                     .padding(.vertical, 2)
-                                                    .background(Color.orange, in: Capsule())
+                                                    .background(Color.accentColor, in: Capsule())
                                             }
                                         }
                                     }
@@ -141,9 +147,10 @@ struct BookDetailView: View {
                                 }
                                 .font(.subheadline)
                                 .fontWeight(.medium)
+                                .foregroundStyle(Color.accentColor)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 10)
-                                .background(Color(.systemGray5))
+                                .background(Color.accentColor.opacity(0.12))
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                             }
                         }
@@ -190,7 +197,7 @@ struct BookDetailView: View {
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.orange)
+                                .background(Color.accentColor)
                                 .foregroundStyle(.white)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
@@ -205,8 +212,8 @@ struct BookDetailView: View {
                                 .font(.headline)
                                 .frame(maxWidth: .infinity)
                                 .padding()
-                                .background(Color.purple)
-                                .foregroundStyle(.white)
+                                .background(Color.accentColor.opacity(0.15))
+                                .foregroundStyle(Color.accentColor)
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
                             }
                         }
@@ -300,16 +307,26 @@ struct DetailSection<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.headline)
-                .foregroundStyle(.primary)
+            HStack(spacing: 8) {
+                RoundedRectangle(cornerRadius: 1.5)
+                    .fill(Color.accentColor)
+                    .frame(width: 3, height: 18)
+
+                Text(title)
+                    .font(.headline)
+                    .foregroundStyle(.primary)
+            }
 
             content()
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color(.systemGray6))
+        .background(Color(.systemGray6).opacity(0.7))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(.systemGray5), lineWidth: 0.5)
+        )
     }
 }
 

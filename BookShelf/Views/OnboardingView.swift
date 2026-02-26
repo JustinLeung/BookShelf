@@ -62,8 +62,9 @@ struct OnboardingView: View {
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.accentColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
+                    .sensoryFeedback(.impact(flexibility: .soft), trigger: currentPage)
 
                     Button {
                         hasCompletedOnboarding = true
@@ -82,8 +83,9 @@ struct OnboardingView: View {
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(Color.accentColor)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
+                    .sensoryFeedback(.success, trigger: hasCompletedOnboarding)
                 }
             }
             .padding(.horizontal, 24)
@@ -105,8 +107,10 @@ struct OnboardingPageView: View {
             Spacer()
 
             Image(systemName: icon)
-                .font(.system(size: 70))
+                .font(.system(size: 44))
                 .foregroundStyle(Color.accentColor)
+                .frame(width: 100, height: 100)
+                .background(Circle().fill(Color.accentColor.opacity(0.1)))
 
             VStack(spacing: 8) {
                 Text(title)
@@ -122,9 +126,10 @@ struct OnboardingPageView: View {
                 ForEach(features, id: \.text) { feature in
                     HStack(spacing: 12) {
                         Image(systemName: feature.icon)
-                            .font(.title3)
+                            .font(.body)
                             .foregroundStyle(Color.accentColor)
-                            .frame(width: 30)
+                            .frame(width: 36, height: 36)
+                            .background(Circle().fill(Color.accentColor.opacity(0.08)))
 
                         Text(feature.text)
                             .font(.body)

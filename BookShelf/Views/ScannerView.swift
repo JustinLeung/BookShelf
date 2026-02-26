@@ -30,8 +30,10 @@ struct ScannerView: View {
                 Spacer()
 
                 Image(systemName: "barcode.viewfinder")
-                    .font(.system(size: 80))
+                    .font(.system(size: 48))
                     .foregroundStyle(Color.accentColor)
+                    .frame(width: 110, height: 110)
+                    .background(Circle().fill(Color.accentColor.opacity(0.1)))
 
                 Text("Scan Book")
                     .font(.title2)
@@ -65,8 +67,8 @@ struct ScannerView: View {
                             .font(.headline)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.orange)
-                            .foregroundStyle(.white)
+                            .background(Color.accentColor.opacity(0.15))
+                            .foregroundStyle(Color.accentColor)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
                 }

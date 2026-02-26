@@ -33,24 +33,38 @@ struct BookCoverView: View {
     }
 
     private var placeholder: some View {
-        ZStack {
+        ZStack(alignment: .leading) {
             RoundedRectangle(cornerRadius: cornerRadius)
-                .fill(Color.accentColor.opacity(0.1))
+                .fill(
+                    LinearGradient(
+                        colors: [Color.accentColor.opacity(0.18), Color.accentColor.opacity(0.08)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+
+            // Spine line on left edge
+            RoundedRectangle(cornerRadius: 1)
+                .fill(Color.accentColor.opacity(0.2))
+                .frame(width: 3)
 
             VStack {
                 Image(systemName: "book.closed.fill")
-                    .font(cornerRadius > 8 ? .system(size: 60) : .largeTitle)
-                    .foregroundStyle(Color.accentColor)
+                    .font(cornerRadius > 8 ? .system(size: 48) : .title2)
+                    .foregroundStyle(Color.accentColor.opacity(0.5))
 
                 if cornerRadius <= 8 {
                     Text(title)
                         .font(.caption2)
+                        .fontWeight(.medium)
+                        .foregroundStyle(Color.accentColor.opacity(0.8))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 4)
                         .lineLimit(3)
                 }
             }
             .padding(8)
+            .frame(maxWidth: .infinity)
         }
     }
 }

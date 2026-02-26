@@ -3,12 +3,17 @@ import SwiftData
 
 @main
 struct BookShelfApp: App {
-    var sharedModelContainer: ModelContainer = {
+    static let isTesting = NSClassFromString("XCTestCase") != nil
+
+    static let sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Book.self,
             ReadingProgressEntry.self
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: isTesting
+        )
 
         do {
             return try ModelContainer(for: schema, configurations: [modelConfiguration])
@@ -19,8 +24,12 @@ struct BookShelfApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            if Self.isTesting {
+                Color.clear
+            } else {
+                ContentView()
+            }
         }
-        .modelContainer(sharedModelContainer)
+        .modelContainer(Self.sharedModelContainer)
     }
 }

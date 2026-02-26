@@ -1,321 +1,343 @@
 import Foundation
 import SwiftData
-import Testing
+import XCTest
 @testable import BookShelf
+
+// MARK: - Shared Test Helpers
+
+class BookShelfTestCase: XCTestCase {
+    var testContext: ModelContext!
+
+    @MainActor
+    override func setUp() {
+        super.setUp()
+        // Reuse the app's in-memory container (isTesting makes it in-memory).
+        // Creating a second ModelContainer for the same @Model types crashes SwiftData.
+        testContext = ModelContext(BookShelfApp.sharedModelContainer)
+    }
+
+    @MainActor
+    override func tearDown() {
+        // Delete all objects so tests stay isolated
+        try? testContext.delete(model: ReadingProgressEntry.self)
+        try? testContext.delete(model: Book.self)
+        try? testContext.save()
+        testContext = nil
+        super.tearDown()
+    }
+
+    @MainActor
+    func makeBook(
+        isbn: String = "1234567890",
+        title: String = "Test",
+        authors: [String] = [],
+        pageCount: Int? = nil,
+        readStatus: ReadStatus = .wantToRead,
+        rating: Int? = nil,
+        dateStarted: Date? = nil,
+        dateFinished: Date? = nil,
+        currentPage: Int? = nil,
+        progressPercentage: Double? = nil
+    ) -> Book {
+        let book = Book(
+            isbn: isbn,
+            title: title,
+            authors: authors,
+            pageCount: pageCount,
+            readStatus: readStatus,
+            rating: rating,
+            dateStarted: dateStarted,
+            dateFinished: dateFinished,
+            currentPage: currentPage,
+            progressPercentage: progressPercentage
+        )
+        testContext.insert(book)
+        return book
+    }
+}
 
 // MARK: - ReadStatus Tests
 
-@Suite("ReadStatus")
-struct ReadStatusTests {
-    @Test("rawValue round-trips through init")
-    func rawValueRoundTrip() {
+final class ReadStatusTests: XCTestCase {
+    func testRawValueRoundTrip() {
         for status in ReadStatus.allCases {
             let restored = ReadStatus(rawValue: status.rawValue)
-            #expect(restored == status)
+            XCTAssertEqual(restored, status)
         }
     }
 
-    @Test("rawValue strings match expected values")
-    func rawValues() {
-        #expect(ReadStatus.wantToRead.rawValue == "want_to_read")
-        #expect(ReadStatus.read.rawValue == "read")
+    func testRawValues() {
+        XCTAssertEqual(ReadStatus.wantToRead.rawValue, "want_to_read")
+        XCTAssertEqual(ReadStatus.read.rawValue, "read")
     }
 
-    @Test("displayName returns human-readable text")
-    func displayName() {
-        #expect(ReadStatus.wantToRead.displayName == "Want to Read")
-        #expect(ReadStatus.read.displayName == "Read")
+    func testDisplayName() {
+        XCTAssertEqual(ReadStatus.wantToRead.displayName, "Want to Read")
+        XCTAssertEqual(ReadStatus.read.displayName, "Read")
     }
 }
 
 // MARK: - Book Tests
 
-@Suite("Book")
-struct BookTests {
-    @Test("authorsDisplay joins multiple authors")
-    func authorsDisplayMultiple() {
-        let book = Book(isbn: "1234567890", title: "Test", authors: ["Alice", "Bob"])
-        #expect(book.authorsDisplay == "Alice, Bob")
+final class BookTests: BookShelfTestCase {
+    @MainActor
+    func testAuthorsDisplayMultiple() {
+        let book = makeBook(authors: ["Alice", "Bob"])
+        XCTAssertEqual(book.authorsDisplay, "Alice, Bob")
     }
 
-    @Test("authorsDisplay returns placeholder when empty")
-    func authorsDisplayEmpty() {
-        let book = Book(isbn: "1234567890", title: "Test", authors: [])
-        #expect(book.authorsDisplay == "Unknown Author")
+    @MainActor
+    func testAuthorsDisplayEmpty() {
+        let book = makeBook(authors: [])
+        XCTAssertEqual(book.authorsDisplay, "Unknown Author")
     }
 
-    @Test("amazonURL uses ISBN with hyphens removed")
-    func amazonURL() {
-        let book = Book(isbn: "978-0-13-468599-1", title: "Test")
-        #expect(book.amazonURL?.absoluteString == "https://www.amazon.com/dp/9780134685991")
+    @MainActor
+    func testAmazonURL() {
+        let book = makeBook(isbn: "978-0-13-468599-1")
+        XCTAssertEqual(book.amazonURL?.absoluteString, "https://www.amazon.com/dp/9780134685991")
     }
 
-    @Test("audibleURL encodes title in search query")
-    func audibleURL() {
-        let book = Book(isbn: "1234567890", title: "Swift Programming")
-        #expect(book.audibleURL?.absoluteString == "https://www.audible.com/search?keywords=Swift%20Programming")
+    @MainActor
+    func testAudibleURL() {
+        let book = makeBook(title: "Swift Programming")
+        XCTAssertEqual(book.audibleURL?.absoluteString, "https://www.audible.com/search?keywords=Swift%20Programming")
     }
 
-    @Test("readStatus defaults to wantToRead")
-    func defaultReadStatus() {
-        let book = Book(isbn: "1234567890", title: "Test")
-        #expect(book.readStatus == .wantToRead)
+    @MainActor
+    func testDefaultReadStatus() {
+        let book = makeBook()
+        XCTAssertEqual(book.readStatus, .wantToRead)
     }
 }
 
 // MARK: - Reading Progress Tests
 
-@Suite("ReadingProgress")
-struct ReadingProgressTests {
-    @Test("calculatedProgress derives from currentPage and pageCount")
-    func calculatedProgressFromPages() {
-        let book = Book(isbn: "1234567890", title: "Test", pageCount: 200, currentPage: 100)
-        #expect(book.calculatedProgress == 0.5)
+final class ReadingProgressTests: BookShelfTestCase {
+    @MainActor
+    func testCalculatedProgressFromPages() {
+        let book = makeBook(pageCount: 200, currentPage: 100)
+        XCTAssertEqual(book.calculatedProgress, 0.5)
     }
 
-    @Test("calculatedProgress falls back to progressPercentage when no pageCount")
-    func calculatedProgressFallback() {
-        let book = Book(isbn: "1234567890", title: "Test", progressPercentage: 0.75)
-        #expect(book.calculatedProgress == 0.75)
+    @MainActor
+    func testCalculatedProgressFallback() {
+        let book = makeBook(progressPercentage: 0.75)
+        XCTAssertEqual(book.calculatedProgress, 0.75)
     }
 
-    @Test("calculatedProgress returns nil when no progress data")
-    func calculatedProgressNil() {
-        let book = Book(isbn: "1234567890", title: "Test")
-        #expect(book.calculatedProgress == nil)
+    @MainActor
+    func testCalculatedProgressNil() {
+        let book = makeBook()
+        XCTAssertNil(book.calculatedProgress)
     }
 
-    @Test("calculatedProgress prefers page-based over percentage")
-    func calculatedProgressPrefersPages() {
-        let book = Book(isbn: "1234567890", title: "Test", pageCount: 100, currentPage: 25, progressPercentage: 0.9)
-        #expect(book.calculatedProgress == 0.25)
+    @MainActor
+    func testCalculatedProgressPrefersPages() {
+        let book = makeBook(pageCount: 100, currentPage: 25, progressPercentage: 0.9)
+        XCTAssertEqual(book.calculatedProgress, 0.25)
     }
 
-    @Test("calculatedProgress clamps to 0.0-1.0 range")
-    func calculatedProgressClamped() {
-        let overBook = Book(isbn: "1234567890", title: "Test", pageCount: 100, currentPage: 150)
-        #expect(overBook.calculatedProgress == 1.0)
+    @MainActor
+    func testCalculatedProgressClamped() {
+        let overBook = makeBook(isbn: "over", pageCount: 100, currentPage: 150)
+        XCTAssertEqual(overBook.calculatedProgress, 1.0)
 
-        let negativeBook = Book(isbn: "1234567890", title: "Test", progressPercentage: -0.5)
-        #expect(negativeBook.calculatedProgress == 0.0)
+        let negativeBook = makeBook(isbn: "neg", progressPercentage: -0.5)
+        XCTAssertEqual(negativeBook.calculatedProgress, 0.0)
 
-        let overPercentage = Book(isbn: "1234567890", title: "Test", progressPercentage: 1.5)
-        #expect(overPercentage.calculatedProgress == 1.0)
+        let overPercentage = makeBook(isbn: "pct", progressPercentage: 1.5)
+        XCTAssertEqual(overPercentage.calculatedProgress, 1.0)
     }
 
-    @Test("calculatedProgress returns nil when pageCount is zero")
-    func calculatedProgressZeroPageCount() {
-        let book = Book(isbn: "1234567890", title: "Test", pageCount: 0, currentPage: 10)
-        #expect(book.calculatedProgress == nil)
+    @MainActor
+    func testCalculatedProgressZeroPageCount() {
+        let book = makeBook(pageCount: 0, currentPage: 10)
+        XCTAssertNil(book.calculatedProgress)
     }
 
-    @Test("currentPage and progressPercentage default to nil")
-    func progressDefaultsToNil() {
-        let book = Book(isbn: "1234567890", title: "Test")
-        #expect(book.currentPage == nil)
-        #expect(book.progressPercentage == nil)
+    @MainActor
+    func testProgressDefaultsToNil() {
+        let book = makeBook()
+        XCTAssertNil(book.currentPage)
+        XCTAssertNil(book.progressPercentage)
     }
 
-    @Test("sampleCurrentlyReading has progress data")
-    func sampleCurrentlyReadingProgress() {
-        let book = Book.sampleCurrentlyReading
-        #expect(book.currentPage == 124)
-        #expect(book.calculatedProgress != nil)
-        #expect(book.calculatedProgress! > 0.0)
-        #expect(book.calculatedProgress! < 1.0)
+    @MainActor
+    func testSampleCurrentlyReadingProgress() {
+        let book = makeBook(
+            isbn: "9780451524935",
+            title: "1984",
+            authors: ["George Orwell"],
+            pageCount: 328,
+            readStatus: .currentlyReading,
+            dateStarted: Calendar.current.date(byAdding: .day, value: -14, to: Date()),
+            currentPage: 124
+        )
+        XCTAssertEqual(book.currentPage, 124)
+        XCTAssertNotNil(book.calculatedProgress)
+        XCTAssertGreaterThan(book.calculatedProgress!, 0.0)
+        XCTAssertLessThan(book.calculatedProgress!, 1.0)
     }
 }
 
 // MARK: - ReadingProgressEntry Tests
 
-@Suite("ReadingProgressEntry")
-struct ReadingProgressEntryTests {
-    @Test("pagesRead returns diff when both have pages")
-    func pagesReadDiff() {
+final class ReadingProgressEntryTests: BookShelfTestCase {
+    @MainActor
+    func testPagesReadDiff() {
         let current = ReadingProgressEntry(bookISBN: "111", page: 100)
         let previous = ReadingProgressEntry(bookISBN: "111", page: 75)
-        #expect(current.pagesRead(since: previous) == 25)
+        testContext.insert(current)
+        testContext.insert(previous)
+        XCTAssertEqual(current.pagesRead(since: previous), 25)
     }
 
-    @Test("pagesRead returns nil when current has no page")
-    func pagesReadNilCurrentPage() {
+    @MainActor
+    func testPagesReadNilCurrentPage() {
         let current = ReadingProgressEntry(bookISBN: "111", page: nil)
         let previous = ReadingProgressEntry(bookISBN: "111", page: 75)
-        #expect(current.pagesRead(since: previous) == nil)
+        testContext.insert(current)
+        testContext.insert(previous)
+        XCTAssertNil(current.pagesRead(since: previous))
     }
 
-    @Test("pagesRead returns currentPage when previous is nil")
-    func pagesReadNoPrevious() {
+    @MainActor
+    func testPagesReadNoPrevious() {
         let current = ReadingProgressEntry(bookISBN: "111", page: 50)
-        #expect(current.pagesRead(since: nil) == 50)
+        testContext.insert(current)
+        XCTAssertEqual(current.pagesRead(since: nil), 50)
     }
 
-    @Test("pagesRead returns nil when diff is zero or negative")
-    func pagesReadNoDiff() {
+    @MainActor
+    func testPagesReadNoDiff() {
         let current = ReadingProgressEntry(bookISBN: "111", page: 50)
         let previous = ReadingProgressEntry(bookISBN: "111", page: 50)
-        #expect(current.pagesRead(since: previous) == nil)
-
         let earlier = ReadingProgressEntry(bookISBN: "111", page: 75)
-        #expect(current.pagesRead(since: earlier) == nil)
+        testContext.insert(current)
+        testContext.insert(previous)
+        testContext.insert(earlier)
+        XCTAssertNil(current.pagesRead(since: previous))
+        XCTAssertNil(current.pagesRead(since: earlier))
     }
 
-    @Test("default timestamp is set automatically")
-    func defaultTimestamp() {
+    @MainActor
+    func testDefaultTimestamp() {
         let before = Date()
         let entry = ReadingProgressEntry(bookISBN: "111", page: 10)
+        testContext.insert(entry)
         let after = Date()
-        #expect(entry.timestamp >= before)
-        #expect(entry.timestamp <= after)
+        XCTAssertGreaterThanOrEqual(entry.timestamp, before)
+        XCTAssertLessThanOrEqual(entry.timestamp, after)
     }
 }
 
 // MARK: - Reading Progress ViewModel Tests
 
-@Suite("ReadingProgressViewModel")
-struct ReadingProgressViewModelTests {
-    @MainActor private static func makeContext() throws -> ModelContext {
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let schema = Schema([Book.self, ReadingProgressEntry.self])
-        let container = try ModelContainer(for: schema, configurations: config)
-        return container.mainContext
-    }
-
-    @Test("progress clears when status changes to wantToRead")
+final class ReadingProgressViewModelTests: BookShelfTestCase {
     @MainActor
-    func progressClearsOnWantToRead() throws {
+    func testProgressClearsOnWantToRead() throws {
         let vm = BookshelfViewModel()
-        let context = try Self.makeContext()
-        let book = Book(isbn: "111", title: "Test", pageCount: 200, readStatus: .currentlyReading, currentPage: 100, progressPercentage: 0.5)
-        context.insert(book)
-        try context.save()
-        vm.setModelContext(context)
+        let book = makeBook(isbn: "111", pageCount: 200, readStatus: .currentlyReading, currentPage: 100, progressPercentage: 0.5)
+        try testContext.save()
+        vm.setModelContext(testContext)
 
         vm.setReadStatus(book, status: .wantToRead)
 
-        #expect(book.currentPage == nil)
-        #expect(book.progressPercentage == nil)
+        XCTAssertNil(book.currentPage)
+        XCTAssertNil(book.progressPercentage)
     }
 
-    @Test("progress set to 100% when status changes to read")
     @MainActor
-    func progressSetsTo100OnRead() throws {
+    func testProgressSetsTo100OnRead() throws {
         let vm = BookshelfViewModel()
-        let context = try Self.makeContext()
-        let book = Book(isbn: "111", title: "Test", pageCount: 200, readStatus: .currentlyReading, currentPage: 100)
-        context.insert(book)
-        try context.save()
-        vm.setModelContext(context)
+        let book = makeBook(isbn: "111", pageCount: 200, readStatus: .currentlyReading, currentPage: 100)
+        try testContext.save()
+        vm.setModelContext(testContext)
 
         vm.setReadStatus(book, status: .read)
 
-        #expect(book.currentPage == 200)
-        #expect(book.progressPercentage == 1.0)
+        XCTAssertEqual(book.currentPage, 200)
+        XCTAssertEqual(book.progressPercentage, 1.0)
     }
 
-    @Test("updateProgress clamps page to pageCount")
     @MainActor
-    func updateProgressClampsPage() throws {
+    func testUpdateProgressClampsPage() throws {
         let vm = BookshelfViewModel()
-        let context = try Self.makeContext()
-        let book = Book(isbn: "111", title: "Test", pageCount: 200, readStatus: .currentlyReading)
-        context.insert(book)
-        try context.save()
-        vm.setModelContext(context)
+        let book = makeBook(isbn: "111", pageCount: 200, readStatus: .currentlyReading)
+        try testContext.save()
+        vm.setModelContext(testContext)
 
         vm.updateProgress(book, page: 300, percentage: nil)
 
-        #expect(book.currentPage == 200)
+        XCTAssertEqual(book.currentPage, 200)
     }
 
-    @Test("updateProgress clamps negative page to zero")
     @MainActor
-    func updateProgressClampsNegativePage() throws {
+    func testUpdateProgressClampsNegativePage() throws {
         let vm = BookshelfViewModel()
-        let context = try Self.makeContext()
-        let book = Book(isbn: "111", title: "Test", pageCount: 200, readStatus: .currentlyReading)
-        context.insert(book)
-        try context.save()
-        vm.setModelContext(context)
+        let book = makeBook(isbn: "111", pageCount: 200, readStatus: .currentlyReading)
+        try testContext.save()
+        vm.setModelContext(testContext)
 
         vm.updateProgress(book, page: -5, percentage: nil)
 
-        #expect(book.currentPage == 0)
+        XCTAssertEqual(book.currentPage, 0)
     }
 
-    @Test("updateProgress sets percentage when no page provided")
     @MainActor
-    func updateProgressSetsPercentage() throws {
+    func testUpdateProgressSetsPercentage() throws {
         let vm = BookshelfViewModel()
-        let context = try Self.makeContext()
-        let book = Book(isbn: "111", title: "Test", readStatus: .currentlyReading)
-        context.insert(book)
-        try context.save()
-        vm.setModelContext(context)
+        let book = makeBook(isbn: "111", readStatus: .currentlyReading)
+        try testContext.save()
+        vm.setModelContext(testContext)
 
         vm.updateProgress(book, page: nil, percentage: 0.65)
 
-        #expect(book.progressPercentage == 0.65)
-        #expect(book.currentPage == nil)
+        XCTAssertEqual(book.progressPercentage, 0.65)
+        XCTAssertNil(book.currentPage)
     }
 }
 
 // MARK: - ReadingProgressEntry Creation Tests
 
-@Suite("ReadingProgressEntryCreation")
-struct ReadingProgressEntryCreationTests {
-    @MainActor private static func makeContext() throws -> ModelContext {
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let schema = Schema([Book.self, ReadingProgressEntry.self])
-        let container = try ModelContainer(for: schema, configurations: config)
-        return container.mainContext
-    }
-
-    @Test("updateProgress creates a ReadingProgressEntry")
+final class ReadingProgressEntryCreationTests: BookShelfTestCase {
     @MainActor
-    func entryCreatedOnUpdate() throws {
+    func testEntryCreatedOnUpdate() throws {
         let vm = BookshelfViewModel()
-        let context = try Self.makeContext()
-        let book = Book(isbn: "222", title: "Test", pageCount: 300, readStatus: .currentlyReading)
-        context.insert(book)
-        try context.save()
-        vm.setModelContext(context)
+        let book = makeBook(isbn: "222", pageCount: 300, readStatus: .currentlyReading)
+        try testContext.save()
+        vm.setModelContext(testContext)
 
         vm.updateProgress(book, page: 50, percentage: nil)
 
         let sessions = vm.fetchReadingSessions(for: "222")
-        #expect(sessions.count == 1)
-        #expect(sessions.first?.page == 50)
-        #expect(sessions.first?.bookISBN == "222")
+        XCTAssertEqual(sessions.count, 1)
+        XCTAssertEqual(sessions.first?.page, 50)
+        XCTAssertEqual(sessions.first?.bookISBN, "222")
     }
 
-    @Test("multiple updateProgress calls create multiple entries")
     @MainActor
-    func multipleEntries() throws {
+    func testMultipleEntries() throws {
         let vm = BookshelfViewModel()
-        let context = try Self.makeContext()
-        let book = Book(isbn: "333", title: "Test", pageCount: 300, readStatus: .currentlyReading)
-        context.insert(book)
-        try context.save()
-        vm.setModelContext(context)
+        let book = makeBook(isbn: "333", pageCount: 300, readStatus: .currentlyReading)
+        try testContext.save()
+        vm.setModelContext(testContext)
 
         vm.updateProgress(book, page: 30, percentage: nil)
         vm.updateProgress(book, page: 60, percentage: nil)
         vm.updateProgress(book, page: 90, percentage: nil)
 
         let sessions = vm.fetchReadingSessions(for: "333")
-        #expect(sessions.count == 3)
+        XCTAssertEqual(sessions.count, 3)
     }
 
-    @Test("entries cleared when status changes to wantToRead")
     @MainActor
-    func entriesClearedOnWantToRead() throws {
+    func testEntriesClearedOnWantToRead() throws {
         let vm = BookshelfViewModel()
-        let context = try Self.makeContext()
-        let book = Book(isbn: "444", title: "Test", pageCount: 300, readStatus: .currentlyReading)
-        context.insert(book)
-        try context.save()
-        vm.setModelContext(context)
+        let book = makeBook(isbn: "444", pageCount: 300, readStatus: .currentlyReading)
+        try testContext.save()
+        vm.setModelContext(testContext)
 
         vm.updateProgress(book, page: 50, percentage: nil)
         vm.updateProgress(book, page: 100, percentage: nil)
@@ -323,47 +345,33 @@ struct ReadingProgressEntryCreationTests {
         vm.setReadStatus(book, status: .wantToRead)
 
         let sessions = vm.fetchReadingSessions(for: "444")
-        #expect(sessions.isEmpty)
+        XCTAssertTrue(sessions.isEmpty)
     }
 }
 
 // MARK: - Reading Pace Tests
 
-@Suite("ReadingPace")
-struct ReadingPaceTests {
-    @MainActor private static func makeContext() throws -> ModelContext {
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let schema = Schema([Book.self, ReadingProgressEntry.self])
-        let container = try ModelContainer(for: schema, configurations: config)
-        return container.mainContext
-    }
-
-    @Test("readingPace returns nil with fewer than 2 sessions")
+final class ReadingPaceTests: BookShelfTestCase {
     @MainActor
-    func paceNilWithFewSessions() throws {
+    func testPaceNilWithFewSessions() throws {
         let vm = BookshelfViewModel()
-        let context = try Self.makeContext()
-        let book = Book(isbn: "555", title: "Test", pageCount: 300, readStatus: .currentlyReading)
-        context.insert(book)
-        try context.save()
-        vm.setModelContext(context)
+        let book = makeBook(isbn: "555", pageCount: 300, readStatus: .currentlyReading)
+        try testContext.save()
+        vm.setModelContext(testContext)
 
-        #expect(vm.readingPace(for: "555") == nil)
+        XCTAssertNil(vm.readingPace(for: "555"))
 
         vm.updateProgress(book, page: 50, percentage: nil)
 
-        #expect(vm.readingPace(for: "555") == nil)
+        XCTAssertNil(vm.readingPace(for: "555"))
     }
 
-    @Test("readingPace calculates correctly")
     @MainActor
-    func paceCalculation() throws {
+    func testPaceCalculation() throws {
         let vm = BookshelfViewModel()
-        let context = try Self.makeContext()
-        let book = Book(isbn: "666", title: "Test", pageCount: 300, readStatus: .currentlyReading)
-        context.insert(book)
-        try context.save()
-        vm.setModelContext(context)
+        let _ = makeBook(isbn: "666", pageCount: 300, readStatus: .currentlyReading)
+        try testContext.save()
+        vm.setModelContext(testContext)
 
         let calendar = Calendar.current
         let now = Date()
@@ -377,22 +385,20 @@ struct ReadingPaceTests {
             page: 120,
             timestamp: now
         )
-        context.insert(entry1)
-        context.insert(entry2)
-        try context.save()
+        testContext.insert(entry1)
+        testContext.insert(entry2)
+        try testContext.save()
 
         let pace = vm.readingPace(for: "666")
-        #expect(pace != nil)
+        XCTAssertNotNil(pace)
         // 100 pages over 10 days = 10 pages/day
-        #expect(pace == 10.0)
+        XCTAssertEqual(pace, 10.0)
     }
 
-    @Test("fetchReadingSessions returns newest first")
     @MainActor
-    func sessionsNewestFirst() throws {
+    func testSessionsNewestFirst() throws {
         let vm = BookshelfViewModel()
-        let context = try Self.makeContext()
-        vm.setModelContext(context)
+        vm.setModelContext(testContext)
 
         let calendar = Calendar.current
         let now = Date()
@@ -406,246 +412,274 @@ struct ReadingPaceTests {
             page: 50,
             timestamp: now
         )
-        context.insert(entry1)
-        context.insert(entry2)
-        try context.save()
+        testContext.insert(entry1)
+        testContext.insert(entry2)
+        try testContext.save()
 
         let sessions = vm.fetchReadingSessions(for: "777")
-        #expect(sessions.count == 2)
-        #expect(sessions.first?.page == 50)
-        #expect(sessions.last?.page == 10)
+        XCTAssertEqual(sessions.count, 2)
+        XCTAssertEqual(sessions.first?.page, 50)
+        XCTAssertEqual(sessions.last?.page, 10)
     }
 }
 
 // MARK: - Book Rating Tests
 
-@Suite("BookRating")
-struct BookRatingTests {
-    @Test("rating defaults to nil")
-    func defaultRating() {
-        let book = Book(isbn: "1234567890", title: "Test")
-        #expect(book.rating == nil)
+final class BookRatingTests: BookShelfTestCase {
+    @MainActor
+    func testDefaultRating() {
+        let book = makeBook()
+        XCTAssertNil(book.rating)
     }
 
-    @Test("init accepts a rating value")
-    func initWithRating() {
-        let book = Book(isbn: "1234567890", title: "Test", rating: 4)
-        #expect(book.rating == 4)
+    @MainActor
+    func testInitWithRating() {
+        let book = makeBook(rating: 4)
+        XCTAssertEqual(book.rating, 4)
     }
 
-    @Test("rating can be set within valid range 1-5")
-    func validRange() {
-        let book = Book(isbn: "1234567890", title: "Test")
+    @MainActor
+    func testValidRange() {
+        let book = makeBook()
         for value in 1...5 {
             book.rating = value
-            #expect(book.rating == value)
+            XCTAssertEqual(book.rating, value)
         }
     }
 
-    @Test("rating can be set to nil")
-    func nilRating() {
-        let book = Book(isbn: "1234567890", title: "Test", rating: 3)
+    @MainActor
+    func testNilRating() {
+        let book = makeBook(rating: 3)
         book.rating = nil
-        #expect(book.rating == nil)
+        XCTAssertNil(book.rating)
     }
 
-    @Test("ratingDisplay returns star string for rated books")
-    func ratingDisplayWithRating() {
-        let book = Book(isbn: "1234567890", title: "Test", rating: 3)
-        #expect(book.ratingDisplay == "★★★☆☆")
+    @MainActor
+    func testRatingDisplayWithRating() {
+        let book = makeBook(rating: 3)
+        XCTAssertEqual(book.ratingDisplay, "★★★☆☆")
     }
 
-    @Test("ratingDisplay returns empty string for unrated books")
-    func ratingDisplayWithoutRating() {
-        let book = Book(isbn: "1234567890", title: "Test")
-        #expect(book.ratingDisplay == "")
+    @MainActor
+    func testRatingDisplayWithoutRating() {
+        let book = makeBook()
+        XCTAssertTrue(book.ratingDisplay.isEmpty)
     }
 
-    @Test("ratingDisplay shows all stars filled for rating of 5")
-    func ratingDisplayFiveStars() {
-        let book = Book(isbn: "1234567890", title: "Test", rating: 5)
-        #expect(book.ratingDisplay == "★★★★★")
+    @MainActor
+    func testRatingDisplayFiveStars() {
+        let book = makeBook(rating: 5)
+        XCTAssertEqual(book.ratingDisplay, "★★★★★")
     }
 
-    @Test("ratingDisplay shows one star filled for rating of 1")
-    func ratingDisplayOneStar() {
-        let book = Book(isbn: "1234567890", title: "Test", rating: 1)
-        #expect(book.ratingDisplay == "★☆☆☆☆")
+    @MainActor
+    func testRatingDisplayOneStar() {
+        let book = makeBook(rating: 1)
+        XCTAssertEqual(book.ratingDisplay, "★☆☆☆☆")
     }
 }
 
 // MARK: - Preview Sample Data Tests
 
-@Suite("PreviewSampleData")
-struct PreviewSampleDataTests {
-    @Test("sampleBooks returns expected count")
-    func sampleBooksCount() {
-        #expect(Book.sampleBooks.count == 5)
+final class PreviewSampleDataTests: BookShelfTestCase {
+    @MainActor
+    func testSampleBooksCount() {
+        let books = makeSampleBooks()
+        XCTAssertEqual(books.count, 5)
     }
 
-    @Test("sampleWantToRead has correct status")
-    func sampleWantToReadStatus() {
-        let book = Book.sampleWantToRead
-        #expect(book.readStatus == .wantToRead)
-        #expect(book.title == "The Hobbit")
-        #expect(book.authors == ["J.R.R. Tolkien"])
-        #expect(book.rating == nil)
-        #expect(book.dateStarted == nil)
-        #expect(book.dateFinished == nil)
+    @MainActor
+    func testSampleWantToReadStatus() {
+        let book = makeBook(
+            isbn: "9780547928227",
+            title: "The Hobbit",
+            authors: ["J.R.R. Tolkien"],
+            readStatus: .wantToRead
+        )
+        XCTAssertEqual(book.readStatus, .wantToRead)
+        XCTAssertEqual(book.title, "The Hobbit")
+        XCTAssertEqual(book.authors, ["J.R.R. Tolkien"])
+        XCTAssertNil(book.rating)
+        XCTAssertNil(book.dateStarted)
+        XCTAssertNil(book.dateFinished)
     }
 
-    @Test("sampleCurrentlyReading has correct status and dateStarted")
-    func sampleCurrentlyReadingStatus() {
-        let book = Book.sampleCurrentlyReading
-        #expect(book.readStatus == .currentlyReading)
-        #expect(book.title == "1984")
-        #expect(book.dateStarted != nil)
-        #expect(book.dateFinished == nil)
+    @MainActor
+    func testSampleCurrentlyReadingStatus() {
+        let book = makeBook(
+            isbn: "9780451524935",
+            title: "1984",
+            authors: ["George Orwell"],
+            readStatus: .currentlyReading,
+            dateStarted: Calendar.current.date(byAdding: .day, value: -14, to: Date())
+        )
+        XCTAssertEqual(book.readStatus, .currentlyReading)
+        XCTAssertEqual(book.title, "1984")
+        XCTAssertNotNil(book.dateStarted)
+        XCTAssertNil(book.dateFinished)
     }
 
-    @Test("sampleReadWithRating has correct status, rating, and dates")
-    func sampleReadWithRatingStatus() {
-        let book = Book.sampleReadWithRating
-        #expect(book.readStatus == .read)
-        #expect(book.title == "To Kill a Mockingbird")
-        #expect(book.rating == 5)
-        #expect(book.dateStarted != nil)
-        #expect(book.dateFinished != nil)
-        #expect(book.daysToRead != nil)
+    @MainActor
+    func testSampleReadWithRatingStatus() {
+        let started = Calendar.current.date(byAdding: .day, value: -45, to: Date())
+        let finished = Calendar.current.date(byAdding: .day, value: -5, to: Date())
+        let book = makeBook(
+            isbn: "9780061120084",
+            title: "To Kill a Mockingbird",
+            authors: ["Harper Lee"],
+            readStatus: .read,
+            rating: 5,
+            dateStarted: started,
+            dateFinished: finished
+        )
+        XCTAssertEqual(book.readStatus, .read)
+        XCTAssertEqual(book.title, "To Kill a Mockingbird")
+        XCTAssertEqual(book.rating, 5)
+        XCTAssertNotNil(book.dateStarted)
+        XCTAssertNotNil(book.dateFinished)
+        XCTAssertNotNil(book.daysToRead)
     }
 
-    @Test("sampleReadNoRating has read status but no rating")
-    func sampleReadNoRatingStatus() {
-        let book = Book.sampleReadNoRating
-        #expect(book.readStatus == .read)
-        #expect(book.title == "The Great Gatsby")
-        #expect(book.rating == nil)
-        #expect(book.dateStarted != nil)
-        #expect(book.dateFinished != nil)
+    @MainActor
+    func testSampleReadNoRatingStatus() {
+        let book = makeBook(
+            isbn: "9780743273565",
+            title: "The Great Gatsby",
+            authors: ["F. Scott Fitzgerald"],
+            readStatus: .read,
+            dateStarted: Calendar.current.date(byAdding: .day, value: -30, to: Date()),
+            dateFinished: Calendar.current.date(byAdding: .day, value: -10, to: Date())
+        )
+        XCTAssertEqual(book.readStatus, .read)
+        XCTAssertEqual(book.title, "The Great Gatsby")
+        XCTAssertNil(book.rating)
+        XCTAssertNotNil(book.dateStarted)
+        XCTAssertNotNil(book.dateFinished)
     }
 
-    @Test("sampleLongTitle defaults to wantToRead")
-    func sampleLongTitleStatus() {
-        let book = Book.sampleLongTitle
-        #expect(book.readStatus == .wantToRead)
-        #expect(book.title == "Sapiens: A Brief History of Humankind")
+    @MainActor
+    func testSampleLongTitleStatus() {
+        let book = makeBook(
+            isbn: "9780062316097",
+            title: "Sapiens: A Brief History of Humankind",
+            authors: ["Yuval Noah Harari"],
+            readStatus: .wantToRead
+        )
+        XCTAssertEqual(book.readStatus, .wantToRead)
+        XCTAssertEqual(book.title, "Sapiens: A Brief History of Humankind")
     }
 
-    @Test("all sample books have non-empty ISBNs and titles")
-    func sampleBooksHaveRequiredFields() {
-        for book in Book.sampleBooks {
-            #expect(!book.isbn.isEmpty)
-            #expect(!book.title.isEmpty)
-            #expect(!book.authors.isEmpty)
+    @MainActor
+    func testSampleBooksHaveRequiredFields() {
+        let books = makeSampleBooks()
+        for book in books {
+            XCTAssertFalse(book.isbn.isEmpty)
+            XCTAssertFalse(book.title.isEmpty)
+            XCTAssertFalse(book.authors.isEmpty)
         }
     }
 
-    @Test("sampleBooks covers all three read statuses")
-    func sampleBooksCoversAllStatuses() {
-        let statuses = Set(Book.sampleBooks.map { $0.readStatus })
-        #expect(statuses.contains(.wantToRead))
-        #expect(statuses.contains(.currentlyReading))
-        #expect(statuses.contains(.read))
+    @MainActor
+    func testSampleBooksCoversAllStatuses() {
+        let books = makeSampleBooks()
+        let statuses = Set(books.map { $0.readStatus })
+        XCTAssertTrue(statuses.contains(.wantToRead))
+        XCTAssertTrue(statuses.contains(.currentlyReading))
+        XCTAssertTrue(statuses.contains(.read))
     }
 
-    @Test("sampleResults returns expected count")
-    func sampleResultsCount() {
-        #expect(BookSearchResult.sampleResults.count == 2)
+    func testSampleResultsCount() {
+        XCTAssertEqual(BookSearchResult.sampleResults.count, 2)
     }
 
-    @Test("sampleResults have valid fields")
-    func sampleResultsFields() {
+    func testSampleResultsFields() {
         for result in BookSearchResult.sampleResults {
-            #expect(!result.isbn.isEmpty)
-            #expect(!result.title.isEmpty)
-            #expect(!result.authors.isEmpty)
+            XCTAssertFalse(result.isbn.isEmpty)
+            XCTAssertFalse(result.title.isEmpty)
+            XCTAssertFalse(result.authors.isEmpty)
         }
+    }
+
+    @MainActor
+    private func makeSampleBooks() -> [Book] {
+        let calendar = Calendar.current
+        let now = Date()
+        return [
+            makeBook(isbn: "9780547928227", title: "The Hobbit", authors: ["J.R.R. Tolkien"], readStatus: .wantToRead),
+            makeBook(isbn: "9780451524935", title: "1984", authors: ["George Orwell"], pageCount: 328, readStatus: .currentlyReading, dateStarted: calendar.date(byAdding: .day, value: -14, to: now), currentPage: 124),
+            makeBook(isbn: "9780061120084", title: "To Kill a Mockingbird", authors: ["Harper Lee"], readStatus: .read, rating: 5, dateStarted: calendar.date(byAdding: .day, value: -45, to: now), dateFinished: calendar.date(byAdding: .day, value: -5, to: now)),
+            makeBook(isbn: "9780743273565", title: "The Great Gatsby", authors: ["F. Scott Fitzgerald"], readStatus: .read, dateStarted: calendar.date(byAdding: .day, value: -30, to: now), dateFinished: calendar.date(byAdding: .day, value: -10, to: now)),
+            makeBook(isbn: "9780062316097", title: "Sapiens: A Brief History of Humankind", authors: ["Yuval Noah Harari"], readStatus: .wantToRead),
+        ]
     }
 }
 
 // MARK: - BookshelfViewModel Tests
 
-@Suite("BookshelfViewModel")
-struct BookshelfViewModelTests {
-    @Test("isInitialized defaults to false")
+final class BookshelfViewModelTests: BookShelfTestCase {
     @MainActor
-    func defaultIsInitialized() {
+    func testDefaultIsInitialized() {
         let vm = BookshelfViewModel()
-        #expect(vm.isInitialized == false)
+        XCTAssertFalse(vm.isInitialized)
     }
 
-    @Test("isInitialized becomes true after setModelContext")
     @MainActor
-    func isInitializedAfterSetModelContext() throws {
+    func testIsInitializedAfterSetModelContext() {
         let vm = BookshelfViewModel()
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let schema = Schema([Book.self, ReadingProgressEntry.self])
-        let container = try ModelContainer(for: schema, configurations: config)
-        vm.setModelContext(container.mainContext)
-        #expect(vm.isInitialized == true)
+        vm.setModelContext(testContext)
+        XCTAssertTrue(vm.isInitialized)
     }
 
-    @Test("books is empty before setModelContext")
     @MainActor
-    func booksEmptyBeforeInit() {
+    func testBooksEmptyBeforeInit() {
         let vm = BookshelfViewModel()
-        #expect(vm.books.isEmpty)
+        XCTAssertTrue(vm.books.isEmpty)
     }
 
-    @Test("fetchBooks loads books after setModelContext")
     @MainActor
-    func fetchBooksLoadsData() throws {
+    func testFetchBooksLoadsData() throws {
         let vm = BookshelfViewModel()
-        let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let schema = Schema([Book.self, ReadingProgressEntry.self])
-        let container = try ModelContainer(for: schema, configurations: config)
-        let context = container.mainContext
-        context.insert(Book(isbn: "111", title: "Book A"))
-        try context.save()
-        vm.setModelContext(context)
-        #expect(vm.books.count == 1)
-        #expect(vm.books.first?.title == "Book A")
+        let _ = makeBook(isbn: "111", title: "Book A")
+        try testContext.save()
+        vm.setModelContext(testContext)
+        XCTAssertEqual(vm.books.count, 1)
+        XCTAssertEqual(vm.books.first?.title, "Book A")
     }
 }
 
 // MARK: - Onboarding Tests
 
-@Suite("Onboarding")
-struct OnboardingTests {
-    @Test("hasCompletedOnboarding defaults to false")
-    func defaultValue() {
+final class OnboardingTests: XCTestCase {
+    func testDefaultValue() {
         let defaults = UserDefaults(suiteName: "OnboardingTest-default")!
         defaults.removePersistentDomain(forName: "OnboardingTest-default")
         let value = defaults.bool(forKey: "hasCompletedOnboarding")
-        #expect(value == false)
+        XCTAssertFalse(value)
     }
 
-    @Test("hasCompletedOnboarding persists true")
-    func persistsTrue() {
+    func testPersistsTrue() {
         let defaults = UserDefaults(suiteName: "OnboardingTest-persist")!
         defaults.removePersistentDomain(forName: "OnboardingTest-persist")
         defaults.set(true, forKey: "hasCompletedOnboarding")
         let value = defaults.bool(forKey: "hasCompletedOnboarding")
-        #expect(value == true)
+        XCTAssertTrue(value)
     }
 
-    @Test("hasCompletedOnboarding can be reset to false")
-    func canReset() {
+    func testCanReset() {
         let defaults = UserDefaults(suiteName: "OnboardingTest-reset")!
         defaults.removePersistentDomain(forName: "OnboardingTest-reset")
         defaults.set(true, forKey: "hasCompletedOnboarding")
         defaults.set(false, forKey: "hasCompletedOnboarding")
         let value = defaults.bool(forKey: "hasCompletedOnboarding")
-        #expect(value == false)
+        XCTAssertFalse(value)
     }
 }
 
 // MARK: - BookSearchResult Tests
 
-@Suite("BookSearchResult")
-struct BookSearchResultTests {
-    @Test("toBook maps all fields correctly")
-    func toBookMapping() {
+final class BookSearchResultTests: BookShelfTestCase {
+    @MainActor
+    func testToBookMapping() {
         let result = BookSearchResult(
             isbn: "1234567890",
             title: "Test Book",
@@ -659,19 +693,20 @@ struct BookSearchResultTests {
 
         let coverData = Data([0x00, 0x01])
         let book = result.toBook(coverData: coverData)
+        testContext.insert(book)
 
-        #expect(book.isbn == "1234567890")
-        #expect(book.title == "Test Book")
-        #expect(book.authors == ["Author A"])
-        #expect(book.publisher == "Publisher")
-        #expect(book.publishDate == "2024")
-        #expect(book.pageCount == 300)
-        #expect(book.bookDescription == "A test book")
-        #expect(book.coverImageData == coverData)
+        XCTAssertEqual(book.isbn, "1234567890")
+        XCTAssertEqual(book.title, "Test Book")
+        XCTAssertEqual(book.authors, ["Author A"])
+        XCTAssertEqual(book.publisher, "Publisher")
+        XCTAssertEqual(book.publishDate, "2024")
+        XCTAssertEqual(book.pageCount, 300)
+        XCTAssertEqual(book.bookDescription, "A test book")
+        XCTAssertEqual(book.coverImageData, coverData)
     }
 
-    @Test("toBook defaults coverData to nil")
-    func toBookNoCoverData() {
+    @MainActor
+    func testToBookNoCoverData() {
         let result = BookSearchResult(
             isbn: "1234567890",
             title: "Test",
@@ -684,6 +719,7 @@ struct BookSearchResultTests {
         )
 
         let book = result.toBook()
-        #expect(book.coverImageData == nil)
+        testContext.insert(book)
+        XCTAssertNil(book.coverImageData)
     }
 }
