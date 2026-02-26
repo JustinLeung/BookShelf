@@ -6,6 +6,7 @@ An iOS app that lets you scan book covers and barcodes to build a personal readi
 
 ## Features
 
+- **Onboarding** — Three-screen onboarding flow introducing scanning, searching, and tracking on first launch
 - **Barcode & Cover Scanning** — Scan ISBN barcodes or use OCR to recognize text on book covers via Apple's Vision framework and `DataScannerViewController`
 - **Smart Book Search** — Multi-strategy search that queries Google Books API with precise operators, falls back to Open Library, and ranks results by relevance
 - **Reading List** — Track books as "Want to Read", "Currently Reading", or "Read" with on-device persistence via SwiftData
@@ -44,6 +45,7 @@ BookShelf/
 │   └── Book.swift               # SwiftData model
 ├── Views/
 │   ├── ContentView.swift        # Tab navigation
+│   ├── OnboardingView.swift     # First-launch onboarding flow
 │   ├── BookshelfView.swift      # Main library grid
 │   ├── BookDetailView.swift     # Book details & status toggle
 │   ├── BookCoverView.swift      # Async off-main-thread cover image decoding
@@ -64,6 +66,7 @@ Every view includes named `#Preview` variants with sample data, wrapped in `#if 
 
 | View | Previews |
 |------|----------|
+| OnboardingView | Onboarding Flow, Welcome Page |
 | ContentView | With Books, Empty |
 | BookshelfView | Populated, Empty, Grid Item variants |
 | BookDetailView | Want to Read, Currently Reading, Read (rated/unrated), DetailSection, DetailRow |

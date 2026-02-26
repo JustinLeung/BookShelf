@@ -3,6 +3,7 @@ import SwiftData
 
 struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var viewModel = BookshelfViewModel()
     @State private var selectedTab = 0
 
@@ -28,6 +29,12 @@ struct ContentView: View {
         }
         .onAppear {
             viewModel.setModelContext(modelContext)
+        }
+        .fullScreenCover(isPresented: Binding(
+            get: { !hasCompletedOnboarding },
+            set: { if !$0 { hasCompletedOnboarding = true } }
+        )) {
+            OnboardingView()
         }
     }
 }

@@ -252,6 +252,38 @@ struct BookshelfViewModelTests {
     }
 }
 
+// MARK: - Onboarding Tests
+
+@Suite("Onboarding")
+struct OnboardingTests {
+    @Test("hasCompletedOnboarding defaults to false")
+    func defaultValue() {
+        let defaults = UserDefaults(suiteName: "OnboardingTest-default")!
+        defaults.removePersistentDomain(forName: "OnboardingTest-default")
+        let value = defaults.bool(forKey: "hasCompletedOnboarding")
+        #expect(value == false)
+    }
+
+    @Test("hasCompletedOnboarding persists true")
+    func persistsTrue() {
+        let defaults = UserDefaults(suiteName: "OnboardingTest-persist")!
+        defaults.removePersistentDomain(forName: "OnboardingTest-persist")
+        defaults.set(true, forKey: "hasCompletedOnboarding")
+        let value = defaults.bool(forKey: "hasCompletedOnboarding")
+        #expect(value == true)
+    }
+
+    @Test("hasCompletedOnboarding can be reset to false")
+    func canReset() {
+        let defaults = UserDefaults(suiteName: "OnboardingTest-reset")!
+        defaults.removePersistentDomain(forName: "OnboardingTest-reset")
+        defaults.set(true, forKey: "hasCompletedOnboarding")
+        defaults.set(false, forKey: "hasCompletedOnboarding")
+        let value = defaults.bool(forKey: "hasCompletedOnboarding")
+        #expect(value == false)
+    }
+}
+
 // MARK: - BookSearchResult Tests
 
 @Suite("BookSearchResult")
