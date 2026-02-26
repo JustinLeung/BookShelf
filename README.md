@@ -12,7 +12,7 @@ An iOS app that lets you scan book covers and barcodes to build a personal readi
 - **Reading List** — Track books as "Want to Read", "Currently Reading", or "Read" with on-device persistence via SwiftData
 - **Star Ratings** — Rate books you've read on a 1–5 star scale
 - **Reading Progress** — Track current page with a circular progress ring, quick-increment buttons with haptics, reading session history, pace tracking (~pages/day), and estimated completion
-- **Book Details** — View cover art, author, publisher, page count, and description
+- **Book Details** — Tabbed detail view with pinned header (cover, title, status badge), an "Activity" tab showing status-contextual actions (progress tracking, ratings, purchase links), and an "About" tab with description and metadata
 - **Quick Links** — Jump directly to Amazon or Audible to purchase a book
 - **Image Caching** — Two-tier caching system (in-memory + disk) for cover images
 - **Startup Performance** — Loading state prevents empty-state flash, async off-main-thread cover image decoding for smooth scrolling, and deduplicated database fetches on launch
