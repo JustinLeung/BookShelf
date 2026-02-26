@@ -159,4 +159,30 @@ struct OnboardingPageView: View {
         ]
     )
 }
+
+#Preview("Add Books Page") {
+    OnboardingPageView(
+        icon: "plus.circle.fill",
+        title: "Add Books Easily",
+        subtitle: "Multiple ways to build your library",
+        features: [
+            ("barcode.viewfinder", "Scan ISBN barcodes with your camera"),
+            ("text.viewfinder", "Use cover OCR to recognize book text"),
+            ("magnifyingglass", "Search by title or author manually")
+        ]
+    )
+}
+
+#Preview("Track Reading Page") {
+    OnboardingPageView(
+        icon: "bookmark.fill",
+        title: "Track Your Reading",
+        subtitle: "Stay on top of your reading journey",
+        features: [
+            ("book.closed", "Mark books as Want to Read"),
+            ("book", "Track what you're Currently Reading"),
+            ("star.fill", "Rate books you've finished reading")
+        ]
+    )
+}
 #endif
