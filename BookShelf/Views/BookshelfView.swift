@@ -6,6 +6,8 @@ struct BookshelfView: View {
     @State private var selectedBook: Book?
     @State private var showDeleteConfirmation = false
     @State private var bookToDelete: Book?
+    @State private var showAddBook = false
+    @State private var showStats = false
 
     private let columns = [
         GridItem(.adaptive(minimum: 120, maximum: 160), spacing: 16)
@@ -50,6 +52,36 @@ struct BookshelfView: View {
             } message: { book in
                 Text("Are you sure you want to remove \"\(book.title)\" from your shelf?")
             }
+            .overlay(alignment: .bottomTrailing) {
+                Button {
+                    showAddBook = true
+                } label: {
+                    Image(systemName: "plus")
+                        .font(.title2)
+                        .fontWeight(.semibold)
+                        .foregroundStyle(.white)
+                        .frame(width: 56, height: 56)
+                        .background(Circle().fill(Color.accentColor))
+                        .shadow(color: Color.accentColor.opacity(0.35), radius: 8, x: 0, y: 4)
+                }
+                .padding(.trailing, 20)
+                .padding(.bottom, 20)
+            }
+            .sheet(isPresented: $showAddBook) {
+                AddBookView(viewModel: viewModel)
+            }
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button {
+                        showStats = true
+                    } label: {
+                        Image(systemName: "chart.bar.fill")
+                    }
+                }
+            }
+            .sheet(isPresented: $showStats) {
+                StatsView(viewModel: viewModel)
+            }
         }
     }
 
@@ -65,7 +97,7 @@ struct BookshelfView: View {
                 .font(.title3)
                 .fontWeight(.semibold)
 
-            Text("Scan a book barcode or search to add books to your shelf")
+            Text("Tap the + button to scan or search for books")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -77,6 +109,9 @@ struct BookshelfView: View {
     private var booksListView: some View {
         ScrollView {
             VStack(spacing: 24) {
+                StatsSummaryCard(viewModel: viewModel)
+                    .onTapGesture { showStats = true }
+
                 // Currently Reading section (shown first, most prominent)
                 if !currentlyReadingBooks.isEmpty {
                     bookSection(title: "Reading", books: currentlyReadingBooks)

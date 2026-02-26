@@ -8,7 +8,8 @@ struct BookShelfApp: App {
     static let sharedModelContainer: ModelContainer = {
         let schema = Schema([
             Book.self,
-            ReadingProgressEntry.self
+            ReadingProgressEntry.self,
+            ReadingGoal.self
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,

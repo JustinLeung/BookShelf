@@ -4,7 +4,7 @@ struct OnboardingView: View {
     @AppStorage("hasCompletedOnboarding") private var hasCompletedOnboarding = false
     @State private var currentPage = 0
 
-    private let pageCount = 3
+    private let pageCount = 4
 
     var body: some View {
         VStack(spacing: 0) {
@@ -44,6 +44,18 @@ struct OnboardingView: View {
                     ]
                 )
                 .tag(2)
+
+                OnboardingPageView(
+                    icon: "chart.bar.fill",
+                    title: "Stats & Goals",
+                    subtitle: "Build a reading habit that sticks",
+                    features: [
+                        ("flame.fill", "Track reading streaks day by day"),
+                        ("target", "Set daily and weekly page goals"),
+                        ("leaf.fill", "Grow a garden as you finish books")
+                    ]
+                )
+                .tag(3)
             }
             .tabViewStyle(.page(indexDisplayMode: .always))
             .animation(.easeInOut, value: currentPage)
@@ -187,6 +199,19 @@ struct OnboardingPageView: View {
             ("book.closed", "Mark books as Want to Read"),
             ("book", "Track what you're Currently Reading"),
             ("star.fill", "Rate books you've finished reading")
+        ]
+    )
+}
+
+#Preview("Stats & Goals Page") {
+    OnboardingPageView(
+        icon: "chart.bar.fill",
+        title: "Stats & Goals",
+        subtitle: "Build a reading habit that sticks",
+        features: [
+            ("flame.fill", "Track reading streaks day by day"),
+            ("target", "Set daily and weekly page goals"),
+            ("leaf.fill", "Grow a garden as you finish books")
         ]
     )
 }

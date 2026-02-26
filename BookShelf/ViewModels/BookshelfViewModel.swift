@@ -319,4 +319,223 @@ class BookshelfViewModel {
     func isBookInShelf(isbn: String) -> Bool {
         books.contains { $0.isbn == isbn }
     }
+
+    // MARK: - Reading Streaks
+
+    func fetchAllProgressEntries() -> [ReadingProgressEntry] {
+        guard let modelContext else { return [] }
+
+        let descriptor = FetchDescriptor<ReadingProgressEntry>(
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+
+        do {
+            return try modelContext.fetch(descriptor)
+        } catch {
+            return []
+        }
+    }
+
+    func readingDays() -> Set<DateComponents> {
+        let entries = fetchAllProgressEntries()
+        let calendar = Calendar.current
+        var days = Set<DateComponents>()
+        for entry in entries {
+            let components = calendar.dateComponents([.year, .month, .day], from: entry.timestamp)
+            days.insert(components)
+        }
+        return days
+    }
+
+    func currentStreak() -> Int {
+        let days = readingDays()
+        guard !days.isEmpty else { return 0 }
+
+        let calendar = Calendar.current
+        let today = calendar.dateComponents([.year, .month, .day], from: Date())
+
+        // Start from today; if no activity today, try yesterday
+        var checkDate = today
+        if !days.contains(checkDate) {
+            guard let yesterday = calendar.date(byAdding: .day, value: -1, to: calendar.date(from: today)!) else { return 0 }
+            checkDate = calendar.dateComponents([.year, .month, .day], from: yesterday)
+            if !days.contains(checkDate) {
+                return 0
+            }
+        }
+
+        var streak = 0
+        var current = checkDate
+        while days.contains(current) {
+            streak += 1
+            guard let prevDate = calendar.date(byAdding: .day, value: -1, to: calendar.date(from: current)!) else { break }
+            current = calendar.dateComponents([.year, .month, .day], from: prevDate)
+        }
+        return streak
+    }
+
+    func longestStreak() -> Int {
+        let days = readingDays()
+        guard !days.isEmpty else { return 0 }
+
+        let calendar = Calendar.current
+        let sortedDates = days.compactMap { calendar.date(from: $0) }.sorted()
+
+        var longest = 1
+        var current = 1
+
+        for i in 1..<sortedDates.count {
+            let daysBetween = calendar.dateComponents([.day], from: sortedDates[i - 1], to: sortedDates[i]).day ?? 0
+            if daysBetween == 1 {
+                current += 1
+                longest = max(longest, current)
+            } else if daysBetween > 1 {
+                current = 1
+            }
+            // daysBetween == 0 means same day (shouldn't happen with Set), skip
+        }
+
+        return longest
+    }
+
+    func hasReadToday() -> Bool {
+        let calendar = Calendar.current
+        let today = calendar.dateComponents([.year, .month, .day], from: Date())
+        return readingDays().contains(today)
+    }
+
+    // MARK: - Lifetime Stats
+
+    var totalBooksRead: Int {
+        books.filter { $0.readStatus == .read }.count
+    }
+
+    var totalPagesRead: Int {
+        books.filter { $0.readStatus == .read }.compactMap(\.pageCount).reduce(0, +)
+    }
+
+    var averageRating: Double? {
+        let ratings = books.compactMap(\.rating)
+        guard !ratings.isEmpty else { return nil }
+        return Double(ratings.reduce(0, +)) / Double(ratings.count)
+    }
+
+    var averageDaysPerBook: Double? {
+        let days = books.compactMap(\.daysToRead)
+        guard !days.isEmpty else { return nil }
+        return Double(days.reduce(0, +)) / Double(days.count)
+    }
+
+    var averagePagesPerDay: Double? {
+        let dayCount = readingDays().count
+        guard dayCount > 0 else { return nil }
+        return Double(totalPagesRead) / Double(dayCount)
+    }
+
+    // MARK: - Time-Based Summaries
+
+    var thisWeekInterval: DateInterval {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: now)!.start
+        return DateInterval(start: startOfWeek, end: now)
+    }
+
+    var thisMonthInterval: DateInterval {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfMonth = calendar.dateInterval(of: .month, for: now)!.start
+        return DateInterval(start: startOfMonth, end: now)
+    }
+
+    var thisYearInterval: DateInterval {
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfYear = calendar.dateInterval(of: .year, for: now)!.start
+        return DateInterval(start: startOfYear, end: now)
+    }
+
+    func booksFinished(in period: DateInterval) -> [Book] {
+        books.filter { book in
+            guard let finished = book.dateFinished else { return false }
+            return period.contains(finished)
+        }
+    }
+
+    func pagesReadInPeriod(_ period: DateInterval) -> Int {
+        let entries = fetchAllProgressEntries()
+        // Group entries by bookISBN, filter to those within period
+        let entriesInPeriod = entries.filter { period.contains($0.timestamp) }
+
+        var total = 0
+        // Group by book
+        let grouped = Dictionary(grouping: entriesInPeriod) { $0.bookISBN }
+
+        for (isbn, bookEntries) in grouped {
+            let sorted = bookEntries.sorted { $0.timestamp < $1.timestamp }
+            // Get the entry just before the period for this book as baseline
+            let allBookEntries = entries.filter { $0.bookISBN == isbn }.sorted { $0.timestamp < $1.timestamp }
+            let baseline = allBookEntries.last { $0.timestamp < period.start }?.page ?? 0
+
+            if let lastInPeriod = sorted.last?.page {
+                let firstInPeriod = sorted.first?.page ?? baseline
+                let startPage = min(firstInPeriod, baseline == 0 ? firstInPeriod : baseline)
+                let diff = lastInPeriod - startPage
+                if diff > 0 {
+                    total += diff
+                }
+            }
+        }
+        return total
+    }
+
+    // MARK: - Reading Goals
+
+    func fetchReadingGoal() -> ReadingGoal? {
+        guard let modelContext else { return nil }
+
+        let descriptor = FetchDescriptor<ReadingGoal>()
+        do {
+            return try modelContext.fetch(descriptor).first
+        } catch {
+            return nil
+        }
+    }
+
+    func saveReadingGoal(daily: Int?, weekly: Int?) {
+        guard let modelContext else { return }
+
+        if let existing = fetchReadingGoal() {
+            existing.dailyPageGoal = daily
+            existing.weeklyPageGoal = weekly
+            existing.dateModified = Date()
+        } else {
+            let goal = ReadingGoal(dailyPageGoal: daily, weeklyPageGoal: weekly)
+            modelContext.insert(goal)
+        }
+
+        do {
+            try modelContext.save()
+        } catch {
+            showError(message: "Failed to save goal: \(error.localizedDescription)")
+        }
+    }
+
+    func dailyGoalProgress() -> (pagesRead: Int, goal: Int)? {
+        guard let goal = fetchReadingGoal(), let dailyGoal = goal.dailyPageGoal else { return nil }
+
+        let calendar = Calendar.current
+        let startOfDay = calendar.startOfDay(for: Date())
+        let period = DateInterval(start: startOfDay, end: Date())
+        let pagesRead = pagesReadInPeriod(period)
+
+        return (pagesRead: pagesRead, goal: dailyGoal)
+    }
+
+    func weeklyGoalProgress() -> (pagesRead: Int, goal: Int)? {
+        guard let goal = fetchReadingGoal(), let weeklyGoal = goal.weeklyPageGoal else { return nil }
+
+        let pagesRead = pagesReadInPeriod(thisWeekInterval)
+        return (pagesRead: pagesRead, goal: weeklyGoal)
+    }
 }

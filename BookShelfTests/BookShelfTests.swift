@@ -20,6 +20,7 @@ class BookShelfTestCase: XCTestCase {
     override func tearDown() {
         // Delete all objects so tests stay isolated
         try? testContext.delete(model: ReadingProgressEntry.self)
+        try? testContext.delete(model: ReadingGoal.self)
         try? testContext.delete(model: Book.self)
         try? testContext.save()
         testContext = nil
@@ -722,5 +723,327 @@ final class BookSearchResultTests: BookShelfTestCase {
         let book = result.toBook()
         testContext.insert(book)
         XCTAssertNil(book.coverImageData)
+    }
+}
+
+// MARK: - Reading Streak Tests
+
+final class ReadingStreakTests: BookShelfTestCase {
+    private func makeEntry(daysAgo: Int, isbn: String = "111") {
+        let calendar = Calendar.current
+        let date = calendar.date(byAdding: .day, value: -daysAgo, to: Date())!
+        let entry = ReadingProgressEntry(bookISBN: isbn, page: 10 + daysAgo, timestamp: date)
+        testContext.insert(entry)
+    }
+
+    @MainActor
+    func testNoEntriesZeroStreak() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        XCTAssertEqual(vm.currentStreak(), 0)
+    }
+
+    @MainActor
+    func testSingleEntryTodayStreakOne() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        makeEntry(daysAgo: 0)
+        try testContext.save()
+        XCTAssertEqual(vm.currentStreak(), 1)
+    }
+
+    @MainActor
+    func testFiveConsecutiveDays() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        for day in 0..<5 {
+            makeEntry(daysAgo: day)
+        }
+        try testContext.save()
+        XCTAssertEqual(vm.currentStreak(), 5)
+    }
+
+    @MainActor
+    func testGapTwoDaysAgoStreakTwo() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        // Today, yesterday, then gap, then 3 days ago
+        makeEntry(daysAgo: 0)
+        makeEntry(daysAgo: 1)
+        makeEntry(daysAgo: 3)
+        try testContext.save()
+        XCTAssertEqual(vm.currentStreak(), 2)
+    }
+
+    @MainActor
+    func testNoEntryTodayButYesterdayStartsFromYesterday() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        makeEntry(daysAgo: 1)
+        makeEntry(daysAgo: 2)
+        makeEntry(daysAgo: 3)
+        try testContext.save()
+        XCTAssertEqual(vm.currentStreak(), 3)
+    }
+
+    @MainActor
+    func testLongestStreakWithHistoricalData() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        // Current streak: 2 days (today + yesterday)
+        makeEntry(daysAgo: 0)
+        makeEntry(daysAgo: 1)
+        // Gap at day 2
+        // Historical streak: 5 days (days 3-7)
+        for day in 3...7 {
+            makeEntry(daysAgo: day)
+        }
+        try testContext.save()
+        XCTAssertEqual(vm.currentStreak(), 2)
+        XCTAssertEqual(vm.longestStreak(), 5)
+    }
+
+    @MainActor
+    func testMultipleEntriesSameDayCountsAsOne() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        // Multiple entries today
+        let now = Date()
+        let entry1 = ReadingProgressEntry(bookISBN: "111", page: 10, timestamp: now)
+        let entry2 = ReadingProgressEntry(bookISBN: "111", page: 20, timestamp: now.addingTimeInterval(-3600))
+        testContext.insert(entry1)
+        testContext.insert(entry2)
+        try testContext.save()
+        XCTAssertEqual(vm.currentStreak(), 1)
+    }
+
+    @MainActor
+    func testEntriesAcrossMultipleBooksAllCount() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        makeEntry(daysAgo: 0, isbn: "aaa")
+        makeEntry(daysAgo: 1, isbn: "bbb")
+        makeEntry(daysAgo: 2, isbn: "aaa")
+        try testContext.save()
+        XCTAssertEqual(vm.currentStreak(), 3)
+    }
+
+    @MainActor
+    func testHasReadToday() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        XCTAssertFalse(vm.hasReadToday())
+        makeEntry(daysAgo: 0)
+        try testContext.save()
+        XCTAssertTrue(vm.hasReadToday())
+    }
+}
+
+// MARK: - Lifetime Stats Tests
+
+final class LifetimeStatsTests: BookShelfTestCase {
+    @MainActor
+    func testTotalBooksReadCountsOnlyReadStatus() throws {
+        let vm = BookshelfViewModel()
+        let _ = makeBook(isbn: "a", readStatus: .read)
+        let _ = makeBook(isbn: "b", readStatus: .read)
+        let _ = makeBook(isbn: "c", readStatus: .currentlyReading)
+        let _ = makeBook(isbn: "d", readStatus: .wantToRead)
+        try testContext.save()
+        vm.setModelContext(testContext)
+        XCTAssertEqual(vm.totalBooksRead, 2)
+    }
+
+    @MainActor
+    func testTotalPagesReadSumsPageCount() throws {
+        let vm = BookshelfViewModel()
+        let _ = makeBook(isbn: "a", pageCount: 200, readStatus: .read)
+        let _ = makeBook(isbn: "b", pageCount: 300, readStatus: .read)
+        let _ = makeBook(isbn: "c", pageCount: 100, readStatus: .currentlyReading)
+        try testContext.save()
+        vm.setModelContext(testContext)
+        XCTAssertEqual(vm.totalPagesRead, 500)
+    }
+
+    @MainActor
+    func testTotalPagesReadSkipsNilPageCount() throws {
+        let vm = BookshelfViewModel()
+        let _ = makeBook(isbn: "a", pageCount: 200, readStatus: .read)
+        let _ = makeBook(isbn: "b", readStatus: .read) // nil pageCount
+        try testContext.save()
+        vm.setModelContext(testContext)
+        XCTAssertEqual(vm.totalPagesRead, 200)
+    }
+
+    @MainActor
+    func testAverageRatingCorrect() throws {
+        let vm = BookshelfViewModel()
+        let _ = makeBook(isbn: "a", readStatus: .read, rating: 4)
+        let _ = makeBook(isbn: "b", readStatus: .read, rating: 2)
+        try testContext.save()
+        vm.setModelContext(testContext)
+        XCTAssertEqual(vm.averageRating, 3.0)
+    }
+
+    @MainActor
+    func testAverageRatingNilWhenNoRatings() throws {
+        let vm = BookshelfViewModel()
+        let _ = makeBook(isbn: "a", readStatus: .read)
+        try testContext.save()
+        vm.setModelContext(testContext)
+        XCTAssertNil(vm.averageRating)
+    }
+
+    @MainActor
+    func testAverageDaysPerBookCorrect() throws {
+        let vm = BookshelfViewModel()
+        let calendar = Calendar.current
+        let now = Date()
+        let _ = makeBook(
+            isbn: "a",
+            readStatus: .read,
+            dateStarted: calendar.date(byAdding: .day, value: -10, to: now),
+            dateFinished: now
+        )
+        let _ = makeBook(
+            isbn: "b",
+            readStatus: .read,
+            dateStarted: calendar.date(byAdding: .day, value: -20, to: now),
+            dateFinished: now
+        )
+        try testContext.save()
+        vm.setModelContext(testContext)
+        XCTAssertEqual(vm.averageDaysPerBook, 15.0)
+    }
+
+    @MainActor
+    func testAverageDaysPerBookNilWithNoDates() throws {
+        let vm = BookshelfViewModel()
+        let _ = makeBook(isbn: "a", readStatus: .read)
+        try testContext.save()
+        vm.setModelContext(testContext)
+        XCTAssertNil(vm.averageDaysPerBook)
+    }
+}
+
+// MARK: - Time Period Stats Tests
+
+final class TimePeriodStatsTests: BookShelfTestCase {
+    @MainActor
+    func testBooksFinishedInWeekBoundary() throws {
+        let vm = BookshelfViewModel()
+        let now = Date()
+        let calendar = Calendar.current
+        let startOfWeek = calendar.dateInterval(of: .weekOfYear, for: now)!.start
+
+        let _ = makeBook(isbn: "a", readStatus: .read, dateFinished: startOfWeek.addingTimeInterval(3600))
+        let _ = makeBook(isbn: "b", readStatus: .read, dateFinished: calendar.date(byAdding: .day, value: -8, to: now))
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        let thisWeek = vm.booksFinished(in: vm.thisWeekInterval)
+        XCTAssertEqual(thisWeek.count, 1)
+        XCTAssertEqual(thisWeek.first?.isbn, "a")
+    }
+
+    @MainActor
+    func testPagesReadInPeriodComputesDiffs() throws {
+        let vm = BookshelfViewModel()
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfDay = calendar.startOfDay(for: now)
+
+        // Entry before today (baseline)
+        let baseline = ReadingProgressEntry(bookISBN: "111", page: 50, timestamp: calendar.date(byAdding: .day, value: -1, to: now)!)
+        // Entry today
+        let todayEntry = ReadingProgressEntry(bookISBN: "111", page: 80, timestamp: startOfDay.addingTimeInterval(3600))
+        testContext.insert(baseline)
+        testContext.insert(todayEntry)
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        let todayPeriod = DateInterval(start: startOfDay, end: now)
+        let pages = vm.pagesReadInPeriod(todayPeriod)
+        XCTAssertEqual(pages, 30)
+    }
+
+    @MainActor
+    func testEntriesOutsideRangeExcluded() throws {
+        let vm = BookshelfViewModel()
+        let calendar = Calendar.current
+        let now = Date()
+
+        // All entries in the past (before this week)
+        let oldEntry = ReadingProgressEntry(bookISBN: "111", page: 100, timestamp: calendar.date(byAdding: .day, value: -14, to: now)!)
+        testContext.insert(oldEntry)
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        let pages = vm.pagesReadInPeriod(vm.thisWeekInterval)
+        XCTAssertEqual(pages, 0)
+    }
+
+    @MainActor
+    func testBooksFinishedExcludesOtherStatuses() throws {
+        let vm = BookshelfViewModel()
+        let now = Date()
+        let _ = makeBook(isbn: "a", readStatus: .read, dateFinished: now)
+        let _ = makeBook(isbn: "b", readStatus: .currentlyReading)
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        let thisYear = vm.booksFinished(in: vm.thisYearInterval)
+        XCTAssertEqual(thisYear.count, 1)
+    }
+}
+
+// MARK: - Reading Goal Tests
+
+final class ReadingGoalTests: BookShelfTestCase {
+    @MainActor
+    func testSaveAndFetchGoal() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        vm.saveReadingGoal(daily: 30, weekly: 200)
+        let goal = vm.fetchReadingGoal()
+
+        XCTAssertNotNil(goal)
+        XCTAssertEqual(goal?.dailyPageGoal, 30)
+        XCTAssertEqual(goal?.weeklyPageGoal, 200)
+    }
+
+    @MainActor
+    func testUpdateExistingGoal() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        vm.saveReadingGoal(daily: 30, weekly: 200)
+        vm.saveReadingGoal(daily: 50, weekly: 300)
+
+        let goal = vm.fetchReadingGoal()
+        XCTAssertEqual(goal?.dailyPageGoal, 50)
+        XCTAssertEqual(goal?.weeklyPageGoal, 300)
+    }
+
+    @MainActor
+    func testReturnsNilWhenNoGoalExists() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        XCTAssertNil(vm.fetchReadingGoal())
+    }
+
+    @MainActor
+    func testDailyGoalProgressNilWhenNoGoal() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        XCTAssertNil(vm.dailyGoalProgress())
+    }
+
+    @MainActor
+    func testWeeklyGoalProgressNilWhenNoGoal() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        XCTAssertNil(vm.weeklyGoalProgress())
     }
 }

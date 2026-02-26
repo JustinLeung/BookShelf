@@ -196,7 +196,7 @@ extension Book {
     @MainActor
     static var previewContainer: ModelContainer {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
-        let schema = Schema([Book.self, ReadingProgressEntry.self])
+        let schema = Schema([Book.self, ReadingProgressEntry.self, ReadingGoal.self])
         // swiftlint:disable:next force_try
         let container = try! ModelContainer(for: schema, configurations: config)
         for book in sampleBooks {
