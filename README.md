@@ -14,7 +14,6 @@ An iOS app that lets you scan book covers and barcodes to build a personal readi
 - **Reading Progress** — Track current page with a circular progress ring, quick-increment buttons with haptics, reading session history, pace tracking (~pages/day), and estimated completion
 - **Reading Stats & Streaks** — Lifetime stats (books, pages, average rating, pace), current and longest reading streaks, time-based summaries (this week/month/year), and a compact stats summary card on the bookshelf
 - **Reading Goals** — Set daily and weekly page goals with progress bars that update as you log reading sessions
-- **Reading Garden** — A light visual garden where each finished book grows a plant (SF Symbols), sized by page count and styled by rating — purely informational, not a reward mechanic
 - **Reminders** — Daily reading reminders at a custom time, plus streak protection notifications at 9 PM when your streak is at risk
 - **Book Details** — Tabbed detail view with pinned header (cover, title, status badge), an "Activity" tab showing status-contextual actions (progress tracking, ratings, purchase links), and an "About" tab with description and metadata
 - **Quick Links** — Jump directly to Amazon or Audible to purchase a book
@@ -58,7 +57,7 @@ BookShelf/
 │   ├── BookDetailView.swift     # Book details & status toggle
 │   ├── BookCoverView.swift      # Async off-main-thread cover image decoding
 │   ├── StatsSummaryCard.swift   # Compact stats card on bookshelf
-│   ├── StatsView.swift          # Full stats: garden, streaks, goals, reminders
+│   ├── StatsView.swift          # Full stats: streaks, goals, reminders
 │   ├── GoalSettingView.swift    # Daily/weekly goal setting sheet
 │   ├── StarRatingView.swift     # Interactive 1-5 star rating
 │   ├── CircularProgressRing.swift # Animated circular progress ring

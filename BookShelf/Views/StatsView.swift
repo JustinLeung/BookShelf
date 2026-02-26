@@ -33,7 +33,6 @@ struct StatsView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 24) {
-                    gardenSection
                     streaksSection
                     lifetimeSection
                     periodSection
@@ -52,69 +51,6 @@ struct StatsView: View {
             .sheet(isPresented: $showGoalSetting) {
                 GoalSettingView(viewModel: viewModel)
             }
-        }
-    }
-
-    // MARK: - Garden
-
-    private var gardenSection: some View {
-        let finishedBooks = viewModel.books.filter { $0.readStatus == .read }
-        return Group {
-            if !finishedBooks.isEmpty {
-                DetailSection(title: "Reading Garden") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("One plant for each book you've finished")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 16) {
-                                ForEach(finishedBooks) { book in
-                                    gardenPlant(for: book)
-                                }
-                            }
-                            .padding(.vertical, 8)
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func gardenPlant(for book: Book) -> some View {
-        let symbol: String = {
-            switch book.rating ?? 0 {
-            case 5: return "tree.fill"
-            case 4: return "leaf.fill"
-            default: return "flower.fill"
-            }
-        }()
-
-        let size: CGFloat = {
-            let pages = book.pageCount ?? 200
-            if pages >= 400 { return 36 }
-            if pages >= 200 { return 28 }
-            return 22
-        }()
-
-        let color: Color = {
-            switch book.rating ?? 0 {
-            case 5: return .green
-            case 4: return .mint
-            case 3: return .teal
-            default: return .green.opacity(0.6)
-            }
-        }()
-
-        return VStack(spacing: 4) {
-            Image(systemName: symbol)
-                .font(.system(size: size))
-                .foregroundStyle(color)
-            Text(book.title)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .frame(width: 60)
         }
     }
 

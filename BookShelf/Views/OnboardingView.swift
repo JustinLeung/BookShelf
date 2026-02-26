@@ -52,7 +52,7 @@ struct OnboardingView: View {
                     features: [
                         ("flame.fill", "Track reading streaks day by day"),
                         ("target", "Set daily and weekly page goals"),
-                        ("leaf.fill", "Grow a garden as you finish books")
+                        ("bell.fill", "Get gentle reminders to keep reading")
                     ]
                 )
                 .tag(3)
@@ -211,7 +211,7 @@ struct OnboardingPageView: View {
         features: [
             ("flame.fill", "Track reading streaks day by day"),
             ("target", "Set daily and weekly page goals"),
-            ("leaf.fill", "Grow a garden as you finish books")
+            ("bell.fill", "Get gentle reminders to keep reading")
         ]
     )
 }
