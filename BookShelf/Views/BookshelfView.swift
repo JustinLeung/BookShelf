@@ -79,7 +79,7 @@ struct BookshelfView: View {
             VStack(spacing: 24) {
                 // Currently Reading section (shown first, most prominent)
                 if !currentlyReadingBooks.isEmpty {
-                    bookSection(title: "Currently Reading", books: currentlyReadingBooks)
+                    bookSection(title: "Reading", books: currentlyReadingBooks)
                 }
 
                 // Want to Read section

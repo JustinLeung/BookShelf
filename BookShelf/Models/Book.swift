@@ -9,7 +9,7 @@ enum ReadStatus: String, Codable, CaseIterable {
     var displayName: String {
         switch self {
         case .wantToRead: return "Want to Read"
-        case .currentlyReading: return "Currently Reading"
+        case .currentlyReading: return "Reading"
         case .read: return "Read"
         }
     }

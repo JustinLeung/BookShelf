@@ -73,6 +73,7 @@ final class ReadStatusTests: XCTestCase {
 
     func testDisplayName() {
         XCTAssertEqual(ReadStatus.wantToRead.displayName, "Want to Read")
+        XCTAssertEqual(ReadStatus.currentlyReading.displayName, "Reading")
         XCTAssertEqual(ReadStatus.read.displayName, "Read")
     }
 }

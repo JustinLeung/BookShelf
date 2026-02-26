@@ -30,27 +30,61 @@ struct BookDetailView: View {
                             .foregroundStyle(.secondary)
                     }
 
-                    // Read Status Toggle
-                    HStack(spacing: 12) {
-                        ForEach(ReadStatus.allCases, id: \.self) { status in
-                            Button {
-                                viewModel.setReadStatus(book, status: status)
-                            } label: {
-                                HStack {
-                                    Image(systemName: status.icon)
-                                    Text(status.displayName)
-                                }
+                    // Read Status
+                    VStack(spacing: 12) {
+                        // Active status badge
+                        HStack(spacing: 6) {
+                            Image(systemName: book.readStatus.icon)
+                                .font(.caption)
+                            Text(book.readStatus.displayName)
                                 .font(.subheadline)
-                                .fontWeight(.medium)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 12)
-                                .background(book.readStatus == status ? Color.accentColor : Color(.systemGray6))
-                                .foregroundStyle(book.readStatus == status ? .white : .primary)
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 10)
-                                        .stroke(Color(.systemGray4), lineWidth: book.readStatus == status ? 0 : 0.5)
-                                )
+                                .fontWeight(.semibold)
+                        }
+                        .foregroundStyle(Color.accentColor)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(Color.accentColor.opacity(0.12))
+                        .clipShape(Capsule())
+
+                        // Contextual action buttons
+                        switch book.readStatus {
+                        case .wantToRead:
+                            statusButton(
+                                title: "Start Reading",
+                                icon: "play.fill",
+                                prominent: true
+                            ) {
+                                viewModel.setReadStatus(book, status: .currentlyReading)
+                            }
+                            statusButton(
+                                title: "Mark as Read",
+                                icon: "checkmark",
+                                prominent: false
+                            ) {
+                                viewModel.setReadStatus(book, status: .read)
+                            }
+                        case .currentlyReading:
+                            statusButton(
+                                title: "Update Progress",
+                                icon: "chart.line.uptrend.xyaxis",
+                                prominent: true
+                            ) {
+                                showProgressUpdate = true
+                            }
+                            statusButton(
+                                title: "Finished",
+                                icon: "checkmark",
+                                prominent: false
+                            ) {
+                                viewModel.setReadStatus(book, status: .read)
+                            }
+                        case .read:
+                            statusButton(
+                                title: "Read Again",
+                                icon: "play.fill",
+                                prominent: false
+                            ) {
+                                viewModel.setReadStatus(book, status: .currentlyReading)
                             }
                         }
                     }
@@ -136,22 +170,6 @@ struct BookDetailView: View {
                                 .padding()
                                 .background(Color(.systemGray6))
                                 .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-
-                            Button {
-                                showProgressUpdate = true
-                            } label: {
-                                HStack {
-                                    Image(systemName: "chart.line.uptrend.xyaxis")
-                                    Text("Update Progress")
-                                }
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundStyle(Color.accentColor)
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .background(Color.accentColor.opacity(0.12))
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
                             }
                         }
                         .padding(.horizontal)
@@ -290,6 +308,22 @@ struct BookDetailView: View {
                     }
                 }
             }
+        }
+    }
+
+    private func statusButton(title: String, icon: String, prominent: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            HStack(spacing: 8) {
+                Image(systemName: icon)
+                Text(title)
+            }
+            .font(.subheadline)
+            .fontWeight(.medium)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+            .background(prominent ? Color.accentColor : Color.accentColor.opacity(0.12))
+            .foregroundStyle(prominent ? .white : Color.accentColor)
+            .clipShape(RoundedRectangle(cornerRadius: 10))
         }
     }
 
