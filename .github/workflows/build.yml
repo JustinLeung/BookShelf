@@ -17,11 +17,8 @@ jobs:
 
       - name: Install iOS Simulator
         run: |
-          if xcrun simctl list runtimes | grep -q 'iOS'; then
-            echo "iOS Simulator runtime already available"
-          else
-            xcodebuild -downloadPlatform iOS
-          fi
+          xcodebuild -downloadPlatform iOS
+          xcrun simctl list runtimes iOS
 
       - name: Build
         run: |
