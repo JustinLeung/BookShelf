@@ -119,6 +119,95 @@ struct BookRatingTests {
     }
 }
 
+// MARK: - Preview Sample Data Tests
+
+@Suite("PreviewSampleData")
+struct PreviewSampleDataTests {
+    @Test("sampleBooks returns expected count")
+    func sampleBooksCount() {
+        #expect(Book.sampleBooks.count == 5)
+    }
+
+    @Test("sampleWantToRead has correct status")
+    func sampleWantToReadStatus() {
+        let book = Book.sampleWantToRead
+        #expect(book.readStatus == .wantToRead)
+        #expect(book.title == "The Hobbit")
+        #expect(book.authors == ["J.R.R. Tolkien"])
+        #expect(book.rating == nil)
+        #expect(book.dateStarted == nil)
+        #expect(book.dateFinished == nil)
+    }
+
+    @Test("sampleCurrentlyReading has correct status and dateStarted")
+    func sampleCurrentlyReadingStatus() {
+        let book = Book.sampleCurrentlyReading
+        #expect(book.readStatus == .currentlyReading)
+        #expect(book.title == "1984")
+        #expect(book.dateStarted != nil)
+        #expect(book.dateFinished == nil)
+    }
+
+    @Test("sampleReadWithRating has correct status, rating, and dates")
+    func sampleReadWithRatingStatus() {
+        let book = Book.sampleReadWithRating
+        #expect(book.readStatus == .read)
+        #expect(book.title == "To Kill a Mockingbird")
+        #expect(book.rating == 5)
+        #expect(book.dateStarted != nil)
+        #expect(book.dateFinished != nil)
+        #expect(book.daysToRead != nil)
+    }
+
+    @Test("sampleReadNoRating has read status but no rating")
+    func sampleReadNoRatingStatus() {
+        let book = Book.sampleReadNoRating
+        #expect(book.readStatus == .read)
+        #expect(book.title == "The Great Gatsby")
+        #expect(book.rating == nil)
+        #expect(book.dateStarted != nil)
+        #expect(book.dateFinished != nil)
+    }
+
+    @Test("sampleLongTitle defaults to wantToRead")
+    func sampleLongTitleStatus() {
+        let book = Book.sampleLongTitle
+        #expect(book.readStatus == .wantToRead)
+        #expect(book.title == "Sapiens: A Brief History of Humankind")
+    }
+
+    @Test("all sample books have non-empty ISBNs and titles")
+    func sampleBooksHaveRequiredFields() {
+        for book in Book.sampleBooks {
+            #expect(!book.isbn.isEmpty)
+            #expect(!book.title.isEmpty)
+            #expect(!book.authors.isEmpty)
+        }
+    }
+
+    @Test("sampleBooks covers all three read statuses")
+    func sampleBooksCoversAllStatuses() {
+        let statuses = Set(Book.sampleBooks.map { $0.readStatus })
+        #expect(statuses.contains(.wantToRead))
+        #expect(statuses.contains(.currentlyReading))
+        #expect(statuses.contains(.read))
+    }
+
+    @Test("sampleResults returns expected count")
+    func sampleResultsCount() {
+        #expect(BookSearchResult.sampleResults.count == 2)
+    }
+
+    @Test("sampleResults have valid fields")
+    func sampleResultsFields() {
+        for result in BookSearchResult.sampleResults {
+            #expect(!result.isbn.isEmpty)
+            #expect(!result.title.isEmpty)
+            #expect(!result.authors.isEmpty)
+        }
+    }
+}
+
 // MARK: - BookSearchResult Tests
 
 @Suite("BookSearchResult")
