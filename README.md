@@ -14,6 +14,7 @@ An iOS app that lets you scan book covers and barcodes to build a personal readi
 - **Reading Progress** — Track current page with a circular progress ring, quick-increment buttons with haptics, reading session history, pace tracking (~pages/day), and estimated completion
 - **Reading Stats & Streaks** — Lifetime stats (books, pages, average rating, pace), current and longest reading streaks, time-based summaries (this week/month/year), and a compact stats summary card on the bookshelf
 - **Reading Goals** — Set daily and weekly page goals with progress bars that update as you log reading sessions
+- **Annual Reading Challenge** — Set a yearly book count goal with progress bar, ahead/behind schedule indicator, and finished book covers for the year
 - **Reminders** — Daily reading reminders at a custom time, plus streak protection notifications at 9 PM when your streak is at risk
 - **Book Details** — Tabbed detail view with pinned header (cover, title, status badge), an "Activity" tab showing status-contextual actions (progress tracking, ratings, purchase links), and an "About" tab with description and metadata
 - **Quick Links** — Jump directly to Amazon or Audible to purchase a book
@@ -48,7 +49,8 @@ BookShelf/
 ├── Models/
 │   ├── Book.swift               # SwiftData model
 │   ├── ReadingProgressEntry.swift # Reading session history model
-│   └── ReadingGoal.swift        # Daily/weekly page goal model
+│   ├── ReadingGoal.swift        # Daily/weekly page goal model
+│   └── ReadingChallenge.swift  # Annual reading challenge model
 ├── Views/
 │   ├── ContentView.swift        # Root view with onboarding + streak reminder
 │   ├── OnboardingView.swift     # First-launch onboarding flow
@@ -59,6 +61,7 @@ BookShelf/
 │   ├── StatsSummaryCard.swift   # Compact stats card on bookshelf
 │   ├── StatsView.swift          # Full stats: streaks, goals, reminders
 │   ├── GoalSettingView.swift    # Daily/weekly goal setting sheet
+│   ├── ChallengeSetupView.swift # Annual reading challenge setup sheet
 │   ├── StarRatingView.swift     # Interactive 1-5 star rating
 │   ├── CircularProgressRing.swift # Animated circular progress ring
 │   ├── ReadingProgressBar.swift # Thin progress bar for grid items
@@ -92,6 +95,7 @@ Every view includes named `#Preview` variants with sample data, wrapped in `#if 
 | StatsSummaryCard | Stats Summary Card |
 | StatsView | Stats View |
 | GoalSettingView | Goal Setting |
+| ChallengeSetupView | Challenge Setup |
 
 ## License
 

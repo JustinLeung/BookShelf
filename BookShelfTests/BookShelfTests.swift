@@ -21,6 +21,7 @@ class BookShelfTestCase: XCTestCase {
         // Delete all objects so tests stay isolated
         try? testContext.delete(model: ReadingProgressEntry.self)
         try? testContext.delete(model: ReadingGoal.self)
+        try? testContext.delete(model: ReadingChallenge.self)
         try? testContext.delete(model: Book.self)
         try? testContext.save()
         testContext = nil
@@ -1045,5 +1046,117 @@ final class ReadingGoalTests: BookShelfTestCase {
         let vm = BookshelfViewModel()
         vm.setModelContext(testContext)
         XCTAssertNil(vm.weeklyGoalProgress())
+    }
+}
+
+// MARK: - Reading Challenge Tests
+
+final class ReadingChallengeTests: BookShelfTestCase {
+    @MainActor
+    func testSaveAndFetchChallenge() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        let year = Calendar.current.component(.year, from: Date())
+        vm.saveChallenge(year: year, goalCount: 24)
+
+        let challenge = vm.fetchChallenge(for: year)
+        XCTAssertNotNil(challenge)
+        XCTAssertEqual(challenge?.year, year)
+        XCTAssertEqual(challenge?.goalCount, 24)
+    }
+
+    @MainActor
+    func testUpdateExistingChallengeGoal() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        let year = Calendar.current.component(.year, from: Date())
+        vm.saveChallenge(year: year, goalCount: 12)
+        vm.saveChallenge(year: year, goalCount: 30)
+
+        let challenge = vm.fetchChallenge(for: year)
+        XCTAssertEqual(challenge?.goalCount, 30)
+    }
+
+    @MainActor
+    func testReturnsNilWhenNoChallengeForYear() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        XCTAssertNil(vm.fetchChallenge(for: 1999))
+    }
+
+    @MainActor
+    func testDeleteChallenge() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+
+        let year = Calendar.current.component(.year, from: Date())
+        vm.saveChallenge(year: year, goalCount: 20)
+        XCTAssertNotNil(vm.fetchChallenge(for: year))
+
+        vm.deleteChallenge(for: year)
+        XCTAssertNil(vm.fetchChallenge(for: year))
+    }
+
+    @MainActor
+    func testBooksReadInYearCountsOnlyFinishedInYear() throws {
+        let vm = BookshelfViewModel()
+        let now = Date()
+        let year = Calendar.current.component(.year, from: now)
+
+        let _ = makeBook(isbn: "a", readStatus: .read, dateFinished: now)
+        let _ = makeBook(isbn: "b", readStatus: .read, dateFinished: now)
+        let _ = makeBook(isbn: "c", readStatus: .currentlyReading)
+        let _ = makeBook(isbn: "d", readStatus: .wantToRead)
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        let result = vm.booksReadInYear(year)
+        XCTAssertEqual(result.count, 2)
+    }
+
+    @MainActor
+    func testBooksReadInYearExcludesOtherYears() throws {
+        let vm = BookshelfViewModel()
+        let now = Date()
+        let calendar = Calendar.current
+        let year = calendar.component(.year, from: now)
+
+        let _ = makeBook(isbn: "a", readStatus: .read, dateFinished: now)
+        let lastYear = calendar.date(from: DateComponents(year: year - 1, month: 6, day: 15))!
+        let _ = makeBook(isbn: "b", readStatus: .read, dateFinished: lastYear)
+        try testContext.save()
+        vm.setModelContext(testContext)
+
+        XCTAssertEqual(vm.booksReadInYear(year).count, 1)
+        XCTAssertEqual(vm.booksReadInYear(year - 1).count, 1)
+    }
+
+    @MainActor
+    func testChallengeProgressReturnsCorrectCounts() throws {
+        let vm = BookshelfViewModel()
+        let now = Date()
+        let year = Calendar.current.component(.year, from: now)
+
+        vm.setModelContext(testContext)
+        vm.saveChallenge(year: year, goalCount: 24)
+
+        let _ = makeBook(isbn: "a", readStatus: .read, dateFinished: now)
+        let _ = makeBook(isbn: "b", readStatus: .read, dateFinished: now)
+        try testContext.save()
+        vm.fetchBooks()
+
+        let progress = vm.challengeProgress()
+        XCTAssertNotNil(progress)
+        XCTAssertEqual(progress?.booksRead, 2)
+        XCTAssertEqual(progress?.goal, 24)
+    }
+
+    @MainActor
+    func testChallengeProgressNilWhenNoChallenge() throws {
+        let vm = BookshelfViewModel()
+        vm.setModelContext(testContext)
+        XCTAssertNil(vm.challengeProgress())
     }
 }

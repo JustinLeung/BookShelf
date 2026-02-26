@@ -9,7 +9,8 @@ struct BookShelfApp: App {
         let schema = Schema([
             Book.self,
             ReadingProgressEntry.self,
-            ReadingGoal.self
+            ReadingGoal.self,
+            ReadingChallenge.self
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,

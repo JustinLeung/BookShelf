@@ -42,6 +42,32 @@ struct StatsSummaryCard: View {
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
+                // Challenge progress
+                if let challenge = viewModel.challengeProgress() {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 4) {
+                            Text("\(Calendar.current.component(.year, from: Date())) Challenge: \(challenge.booksRead)/\(challenge.goal)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            Spacer()
+                            Text(challenge.aheadBy >= 0 ? "\(challenge.aheadBy) ahead" : "\(abs(challenge.aheadBy)) behind")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundStyle(challenge.aheadBy >= 0 ? Color.green : Color.orange)
+                        }
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(Color(.systemGray4))
+                                RoundedRectangle(cornerRadius: 3)
+                                    .fill(challenge.booksRead >= challenge.goal ? Color.green : Color.accentColor)
+                                    .frame(width: geo.size.width * min(1.0, Double(challenge.booksRead) / Double(max(challenge.goal, 1))))
+                            }
+                        }
+                        .frame(height: 6)
+                    }
+                }
+
                 // Daily goal progress
                 if let progress = viewModel.dailyGoalProgress() {
                     VStack(alignment: .leading, spacing: 4) {

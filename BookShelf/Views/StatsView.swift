@@ -4,6 +4,7 @@ struct StatsView: View {
     @Bindable var viewModel: BookshelfViewModel
     @Environment(\.dismiss) private var dismiss
     @State private var showGoalSetting = false
+    @State private var showChallengeSetup = false
 
     @AppStorage("reminderEnabled") private var reminderEnabled = false
     @AppStorage("reminderHour") private var reminderHour = 20
@@ -36,6 +37,7 @@ struct StatsView: View {
                     streaksSection
                     lifetimeSection
                     periodSection
+                    challengeSection
                     goalsSection
                     remindersSection
                 }
@@ -50,6 +52,9 @@ struct StatsView: View {
             }
             .sheet(isPresented: $showGoalSetting) {
                 GoalSettingView(viewModel: viewModel)
+            }
+            .sheet(isPresented: $showChallengeSetup) {
+                ChallengeSetupView(viewModel: viewModel)
             }
         }
     }
@@ -127,6 +132,78 @@ struct StatsView: View {
                 let yearBooks = viewModel.booksFinished(in: viewModel.thisYearInterval).count
                 let yearPages = viewModel.pagesReadInPeriod(viewModel.thisYearInterval)
                 DetailRow(label: "This Year", value: "\(yearPages) pages · \(yearBooks) books")
+            }
+        }
+    }
+
+    // MARK: - Challenge
+
+    private var challengeSection: some View {
+        let currentYear = Calendar.current.component(.year, from: Date())
+
+        return DetailSection(title: "\(String(currentYear)) Reading Challenge") {
+            VStack(alignment: .leading, spacing: 12) {
+                if let progress = viewModel.challengeProgress() {
+                    HStack {
+                        Text("\(progress.booksRead) of \(progress.goal) books")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                        Spacer()
+                        Text(progress.aheadBy >= 0 ? "\(progress.aheadBy) ahead" : "\(abs(progress.aheadBy)) behind")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundStyle(progress.aheadBy >= 0 ? Color.green : Color.orange)
+                    }
+
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(Color(.systemGray4))
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(progress.booksRead >= progress.goal ? Color.green : Color.accentColor)
+                                .frame(width: geo.size.width * min(1.0, Double(progress.booksRead) / Double(max(progress.goal, 1))))
+                        }
+                    }
+                    .frame(height: 8)
+
+                    let finishedBooks = viewModel.booksReadInYear(currentYear)
+                    if !finishedBooks.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(finishedBooks, id: \.isbn) { book in
+                                    BookCoverView(coverData: book.coverImageData, title: book.title, cornerRadius: 4)
+                                        .frame(width: 44, height: 66)
+                                }
+                            }
+                        }
+                    }
+
+                    Button {
+                        showChallengeSetup = true
+                    } label: {
+                        Text("Edit Goal")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.accentColor.opacity(0.12))
+                            .foregroundStyle(Color.accentColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                } else {
+                    Button {
+                        showChallengeSetup = true
+                    } label: {
+                        Text("Set a Reading Challenge")
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 10)
+                            .background(Color.accentColor.opacity(0.12))
+                            .foregroundStyle(Color.accentColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
             }
         }
     }

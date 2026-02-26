@@ -538,4 +538,72 @@ class BookshelfViewModel {
         let pagesRead = pagesReadInPeriod(thisWeekInterval)
         return (pagesRead: pagesRead, goal: weeklyGoal)
     }
+
+    // MARK: - Reading Challenge
+
+    func fetchChallenge(for year: Int) -> ReadingChallenge? {
+        guard let modelContext else { return nil }
+
+        let descriptor = FetchDescriptor<ReadingChallenge>(
+            predicate: #Predicate { $0.year == year }
+        )
+        do {
+            return try modelContext.fetch(descriptor).first
+        } catch {
+            return nil
+        }
+    }
+
+    func saveChallenge(year: Int, goalCount: Int) {
+        guard let modelContext else { return }
+
+        if let existing = fetchChallenge(for: year) {
+            existing.goalCount = goalCount
+            existing.dateModified = Date()
+        } else {
+            let challenge = ReadingChallenge(year: year, goalCount: goalCount)
+            modelContext.insert(challenge)
+        }
+
+        do {
+            try modelContext.save()
+        } catch {
+            showError(message: "Failed to save challenge: \(error.localizedDescription)")
+        }
+    }
+
+    func deleteChallenge(for year: Int) {
+        guard let modelContext else { return }
+
+        if let challenge = fetchChallenge(for: year) {
+            modelContext.delete(challenge)
+            do {
+                try modelContext.save()
+            } catch {
+                showError(message: "Failed to delete challenge: \(error.localizedDescription)")
+            }
+        }
+    }
+
+    func booksReadInYear(_ year: Int) -> [Book] {
+        let calendar = Calendar.current
+        return books.filter { book in
+            guard book.readStatus == .read, let finished = book.dateFinished else { return false }
+            return calendar.component(.year, from: finished) == year
+        }
+    }
+
+    func challengeProgress() -> (booksRead: Int, goal: Int, aheadBy: Int)? {
+        let calendar = Calendar.current
+        let currentYear = calendar.component(.year, from: Date())
+        guard let challenge = fetchChallenge(for: currentYear) else { return nil }
+
+        let booksRead = booksReadInYear(currentYear).count
+        let dayOfYear = calendar.ordinality(of: .day, in: .year, for: Date()) ?? 1
+        let daysInYear: Int = calendar.range(of: .day, in: .year, for: Date())?.count ?? 365
+        let expectedBooks = Int(round(Double(challenge.goalCount) * Double(dayOfYear) / Double(daysInYear)))
+        let aheadBy = booksRead - expectedBooks
+
+        return (booksRead: booksRead, goal: challenge.goalCount, aheadBy: aheadBy)
+    }
 }
