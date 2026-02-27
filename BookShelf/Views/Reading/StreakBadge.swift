@@ -20,12 +20,11 @@ struct StreakBadge: View {
             VStack(spacing: 8) {
                 HStack(spacing: 6) {
                     Image(systemName: "flame.fill")
-                        .foregroundStyle(streak >= 7 ? Color.orange : Color.accentColor)
+                        .foregroundStyle(streak >= 7 ? AppTheme.Colors.amber : Color.accentColor)
                         .font(.title2)
 
                     Text("\(streak)")
-                        .font(.title)
-                        .fontWeight(.bold)
+                        .font(AppTheme.Typography.sectionTitle)
 
                     Text(streak == 1 ? "day" : "days")
                         .font(.subheadline)
@@ -36,17 +35,15 @@ struct StreakBadge: View {
                     Text(message)
                         .font(.caption)
                         .fontWeight(.semibold)
-                        .foregroundStyle(Color.orange)
+                        .foregroundStyle(AppTheme.Colors.amber)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 4)
-                        .background(Color.orange.opacity(0.12))
+                        .background(AppTheme.Colors.amber.opacity(0.12))
                         .clipShape(Capsule())
                 }
             }
-            .padding()
             .frame(maxWidth: .infinity)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .themedCard()
         }
     }
 }

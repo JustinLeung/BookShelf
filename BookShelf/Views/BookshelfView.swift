@@ -3,6 +3,7 @@ import SwiftUI
 struct BookshelfView: View {
     @Bindable var viewModel: BookshelfViewModel
     @Bindable var timerViewModel: ReadingTimerViewModel
+    @Environment(\.colorScheme) private var colorScheme
 
     @State private var selectedBook: Book?
     @State private var showDeleteConfirmation = false
@@ -70,7 +71,7 @@ struct BookshelfView: View {
                         .foregroundStyle(.white)
                         .frame(width: 56, height: 56)
                         .background(Circle().fill(Color.accentColor))
-                        .shadow(color: Color.accentColor.opacity(0.35), radius: 8, x: 0, y: 4)
+                        .shadow(color: AppTheme.Colors.espresso.opacity(0.35), radius: 8, x: 0, y: 4)
                 }
                 .padding(.trailing, 20)
                 .padding(.bottom, 20)
@@ -85,13 +86,12 @@ struct BookshelfView: View {
         VStack(spacing: 16) {
             Image(systemName: "books.vertical")
                 .font(.system(size: 36))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(AppTheme.Colors.terracotta)
                 .frame(width: 80, height: 80)
-                .background(Circle().fill(Color.accentColor.opacity(0.08)))
+                .background(Circle().fill(AppTheme.Colors.terracotta.opacity(0.08)))
 
             Text("No Books Yet")
-                .font(.title3)
-                .fontWeight(.semibold)
+                .font(.system(.title3, design: .serif, weight: .semibold))
 
             Text("Tap the + button to scan or search for books")
                 .font(.subheadline)
@@ -129,6 +129,7 @@ struct BookshelfView: View {
             }
             .padding(.vertical)
         }
+        .background(AppTheme.Colors.pageBackground(colorScheme))
         .refreshable {
             viewModel.fetchBooks()
         }
@@ -142,8 +143,7 @@ struct BookshelfView: View {
                     .frame(width: 4, height: 22)
 
                 Text(title)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(AppTheme.Typography.sectionTitle)
 
                 Text("\(books.count)")
                     .font(.subheadline)
@@ -212,6 +212,7 @@ struct BookshelfView: View {
 
 struct BookGridItem: View {
     let book: Book
+    @Environment(\.colorScheme) private var colorScheme
     @State private var isPressed = false
 
     var body: some View {
@@ -248,9 +249,9 @@ struct BookGridItem: View {
         }
         .padding(10)
         .background(
-            RoundedRectangle(cornerRadius: 12)
-                .fill(Color(.systemBackground))
-                .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 2)
+            RoundedRectangle(cornerRadius: AppTheme.Layout.cardCornerRadius)
+                .fill(AppTheme.Colors.cardBackground(colorScheme))
+                .shadow(color: AppTheme.Colors.espresso.opacity(colorScheme == .light ? 0.08 : 0.2), radius: 8, x: 0, y: 2)
         )
         .scaleEffect(isPressed ? 0.95 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isPressed)

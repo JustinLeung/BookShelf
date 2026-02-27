@@ -14,17 +14,16 @@ struct ReadingTimerView: View {
                 if let book = timerViewModel.currentBook {
                     BookCoverView(coverData: book.coverImageData, title: book.title, cornerRadius: 12)
                         .frame(height: 160)
-                        .shadow(color: .black.opacity(0.2), radius: 10, x: 0, y: 5)
+                        .shadow(color: AppTheme.Colors.espresso.opacity(0.3), radius: 10, x: 0, y: 5)
 
                     Text(book.title)
-                        .font(.title3)
-                        .fontWeight(.semibold)
+                        .font(.system(.title3, design: .serif, weight: .semibold))
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                 }
 
                 Text(timerViewModel.formattedTime)
-                    .font(.system(size: 64, weight: .light, design: .monospaced))
+                    .font(AppTheme.Typography.display(size: 64))
                     .contentTransition(.numericText())
 
                 HStack(spacing: 32) {

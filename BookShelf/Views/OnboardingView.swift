@@ -73,7 +73,7 @@ struct OnboardingView: View {
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.accentColor)
+                            .background(AppTheme.Gradients.accent)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                     .sensoryFeedback(.impact(flexibility: .soft), trigger: currentPage)
@@ -94,7 +94,7 @@ struct OnboardingView: View {
                             .foregroundStyle(.white)
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(Color.accentColor)
+                            .background(AppTheme.Gradients.accent)
                             .clipShape(RoundedRectangle(cornerRadius: 14))
                     }
                     .sensoryFeedback(.success, trigger: hasCompletedOnboarding)
@@ -120,14 +120,13 @@ struct OnboardingPageView: View {
 
             Image(systemName: icon)
                 .font(.system(size: 44))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(AppTheme.Colors.terracotta)
                 .frame(width: 100, height: 100)
-                .background(Circle().fill(Color.accentColor.opacity(0.1)))
+                .background(Circle().fill(AppTheme.Colors.terracotta.opacity(0.1)))
 
             VStack(spacing: 8) {
                 Text(title)
-                    .font(.title2)
-                    .fontWeight(.bold)
+                    .font(AppTheme.Typography.sectionTitle)
 
                 Text(subtitle)
                     .font(.subheadline)
@@ -141,7 +140,7 @@ struct OnboardingPageView: View {
                             .font(.body)
                             .foregroundStyle(Color.accentColor)
                             .frame(width: 36, height: 36)
-                            .background(Circle().fill(Color.accentColor.opacity(0.08)))
+                            .background(Circle().fill(AppTheme.Colors.terracotta.opacity(0.08)))
 
                         Text(feature.text)
                             .font(.body)

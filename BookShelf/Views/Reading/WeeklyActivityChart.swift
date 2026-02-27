@@ -2,6 +2,7 @@ import SwiftUI
 
 struct WeeklyActivityChart: View {
     @Bindable var viewModel: BookshelfViewModel
+    @Environment(\.colorScheme) private var colorScheme
 
     private var weekData: [(day: String, pages: Int)] {
         let calendar = Calendar.current
@@ -28,14 +29,13 @@ struct WeeklyActivityChart: View {
         if hasData {
             VStack(alignment: .leading, spacing: 8) {
                 Text("This Week")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .font(AppTheme.Typography.cardTitle)
 
                 HStack(alignment: .bottom, spacing: 8) {
                     ForEach(Array(data.enumerated()), id: \.offset) { _, item in
                         VStack(spacing: 4) {
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(item.pages > 0 ? Color.accentColor : Color(.systemGray4))
+                                .fill(item.pages > 0 ? Color.accentColor : AppTheme.Colors.progressTrack(colorScheme))
                                 .frame(height: max(4, CGFloat(item.pages) / CGFloat(maxPages) * 80))
 
                             Text(item.day)
@@ -47,9 +47,7 @@ struct WeeklyActivityChart: View {
                 }
                 .frame(height: 100)
             }
-            .padding()
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .themedCard()
         }
     }
 }

@@ -70,6 +70,8 @@
 		DD19AA11BB22DD33EE44FF19 /* NoteInputView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC19AA11BB22DD33EE44FF19 /* NoteInputView.swift */; };
 		FB78901234567890BCDEF012 /* CircularProgressRing.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB78901234567890BCDEF013 /* CircularProgressRing.swift */; };
 		FF604C674FC4BA6FE8769BE5 /* BookShelfTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8C7DE30EAA16B8622358C01 /* BookShelfTests.swift */; };
+		TH01AA11BB22DD33EE44FF01 /* AppTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = TH01AA11BB22DD33EE44FF02 /* AppTheme.swift */; };
+		TH02AA11BB22DD33EE44FF01 /* ThemeModifiers.swift in Sources */ = {isa = PBXBuildFile; fileRef = TH02AA11BB22DD33EE44FF02 /* ThemeModifiers.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -157,6 +159,8 @@
 		AA66FF778899AABB00000002 /* GoalSettingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GoalSettingView.swift; sourceTree = "<group>"; };
 		FB78901234567890BCDEF013 /* CircularProgressRing.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CircularProgressRing.swift; sourceTree = "<group>"; };
 		FEE4D5731C59D11D80ED2C2A /* ScannerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScannerView.swift; sourceTree = "<group>"; };
+		TH01AA11BB22DD33EE44FF02 /* AppTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppTheme.swift; sourceTree = "<group>"; };
+		TH02AA11BB22DD33EE44FF02 /* ThemeModifiers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeModifiers.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -255,6 +259,7 @@
 				91BAE34C3F017A0A5E76E449 /* LaunchScreen.storyboard */,
 				85A999D965B038B0B2C0B01C /* Models */,
 				90FDCF4AED2B647E1B85049A /* Services */,
+				TH00AA11BB22DD33EE44FF00 /* Theme */,
 				245E35F418A75F9C3A152221 /* ViewModels */,
 				CD27A44111AE4C916D00B850 /* Views */,
 			);
@@ -448,6 +453,15 @@
 			);
 			name = PreviewHost;
 			path = PreviewHost;
+			sourceTree = "<group>";
+		};
+		TH00AA11BB22DD33EE44FF00 /* Theme */ = {
+			isa = PBXGroup;
+			children = (
+				TH01AA11BB22DD33EE44FF02 /* AppTheme.swift */,
+				TH02AA11BB22DD33EE44FF02 /* ThemeModifiers.swift */,
+			);
+			path = Theme;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -706,6 +720,8 @@
 				247D4D1D38CF306C346A3DF5 /* ScannerView.swift in Sources */,
 				AB12CD34EF56789012345678 /* StarRatingView.swift in Sources */,
 				AA44DD55EE66FF7788000001 /* StatsSummaryCard.swift in Sources */,
+				TH01AA11BB22DD33EE44FF01 /* AppTheme.swift in Sources */,
+				TH02AA11BB22DD33EE44FF01 /* ThemeModifiers.swift in Sources */,
 				AA55EE66FF778899AA000001 /* StatsView.swift in Sources */,
 				DD12AA11BB22DD33EE44FF12 /* StreakBadge.swift in Sources */,
 				DD03AA11BB22DD33EE44FF03 /* StreakFreeze.swift in Sources */,

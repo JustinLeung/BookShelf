@@ -2,6 +2,7 @@ import SwiftUI
 
 struct StatsView: View {
     @Bindable var viewModel: BookshelfViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showGoalSetting = false
     @State private var showChallengeSetup = false
 
@@ -42,6 +43,7 @@ struct StatsView: View {
                 }
                 .padding()
             }
+            .background(AppTheme.Colors.pageBackground(colorScheme))
             .navigationTitle("Reading Stats")
             .sheet(isPresented: $showGoalSetting) {
                 GoalSettingView(viewModel: viewModel)
@@ -63,10 +65,9 @@ struct StatsView: View {
                 VStack(spacing: 4) {
                     HStack(spacing: 4) {
                         Image(systemName: "flame.fill")
-                            .foregroundStyle(current > 0 ? Color.orange : .secondary)
+                            .foregroundStyle(current > 0 ? AppTheme.Colors.amber : .secondary)
                         Text("\(current)")
-                            .font(.title)
-                            .fontWeight(.bold)
+                            .font(.system(.title, design: .serif, weight: .bold))
                     }
                     Text("Current")
                         .font(.caption)
@@ -75,8 +76,7 @@ struct StatsView: View {
 
                 VStack(spacing: 4) {
                     Text("\(longest)")
-                        .font(.title)
-                        .fontWeight(.bold)
+                        .font(.system(.title, design: .serif, weight: .bold))
                     Text("Longest")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -145,15 +145,15 @@ struct StatsView: View {
                         Text(progress.aheadBy >= 0 ? "\(progress.aheadBy) ahead" : "\(abs(progress.aheadBy)) behind")
                             .font(.caption)
                             .fontWeight(.semibold)
-                            .foregroundStyle(progress.aheadBy >= 0 ? Color.green : Color.orange)
+                            .foregroundStyle(progress.aheadBy >= 0 ? AppTheme.Colors.sage : AppTheme.Colors.amber)
                     }
 
                     GeometryReader { geo in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(Color(.systemGray4))
+                                .fill(AppTheme.Colors.progressTrack(colorScheme))
                             RoundedRectangle(cornerRadius: 4)
-                                .fill(progress.booksRead >= progress.goal ? Color.green : Color.accentColor)
+                                .fill(progress.booksRead >= progress.goal ? AppTheme.Colors.sage : Color.accentColor)
                                 .frame(width: geo.size.width * min(1.0, Double(progress.booksRead) / Double(max(progress.goal, 1))))
                         }
                     }
@@ -250,9 +250,9 @@ struct StatsView: View {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(Color(.systemGray4))
+                        .fill(AppTheme.Colors.progressTrack(colorScheme))
                     RoundedRectangle(cornerRadius: 4)
-                        .fill(pagesRead >= goal ? Color.green : Color.accentColor)
+                        .fill(pagesRead >= goal ? AppTheme.Colors.sage : Color.accentColor)
                         .frame(width: geo.size.width * min(1.0, Double(pagesRead) / Double(max(goal, 1))))
                 }
             }

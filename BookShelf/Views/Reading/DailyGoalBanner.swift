@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DailyGoalBanner: View {
     @Bindable var viewModel: BookshelfViewModel
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         if let progress = viewModel.dailyGoalProgress() {
@@ -10,8 +11,7 @@ struct DailyGoalBanner: View {
                     Image(systemName: "target")
                         .foregroundStyle(Color.accentColor)
                     Text("Daily Goal")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .font(AppTheme.Typography.cardTitle)
                     Spacer()
                     Text("\(progress.pagesRead)/\(progress.goal) pages")
                         .font(.caption)
@@ -21,9 +21,9 @@ struct DailyGoalBanner: View {
                 GeometryReader { geo in
                     ZStack(alignment: .leading) {
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(Color(.systemGray4))
+                            .fill(AppTheme.Colors.progressTrack(colorScheme))
                         RoundedRectangle(cornerRadius: 4)
-                            .fill(progress.pagesRead >= progress.goal ? Color.green : Color.accentColor)
+                            .fill(progress.pagesRead >= progress.goal ? AppTheme.Colors.sage : Color.accentColor)
                             .frame(width: geo.size.width * min(1.0, Double(progress.pagesRead) / Double(max(progress.goal, 1))))
                     }
                 }
@@ -32,12 +32,10 @@ struct DailyGoalBanner: View {
                 if progress.pagesRead >= progress.goal {
                     Text("Goal reached! Keep it up!")
                         .font(.caption)
-                        .foregroundStyle(.green)
+                        .foregroundStyle(AppTheme.Colors.sage)
                 }
             }
-            .padding()
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .themedCard()
         }
     }
 }

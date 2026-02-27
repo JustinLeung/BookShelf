@@ -28,8 +28,7 @@ struct CurrentlyReadingCard: View {
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text(book.title)
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
+                        .font(AppTheme.Typography.cardTitle)
                         .lineLimit(2)
 
                     Text(book.authorsDisplay)
@@ -70,7 +69,7 @@ struct CurrentlyReadingCard: View {
                     .fontWeight(.medium)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 8)
-                    .background(Color.accentColor)
+                    .background(AppTheme.Gradients.accent)
                     .foregroundStyle(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
@@ -92,9 +91,7 @@ struct CurrentlyReadingCard: View {
                 }
             }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .themedCard()
         .sheet(isPresented: $showProgressUpdate) {
             let sessions = viewModel.fetchReadingSessions(for: book.isbn)
             ProgressUpdateView(

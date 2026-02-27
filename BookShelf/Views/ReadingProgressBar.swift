@@ -5,12 +5,14 @@ struct ReadingProgressBar: View {
     var height: CGFloat = 4
     var showLabel: Bool = false
 
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         VStack(spacing: 4) {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     Capsule()
-                        .fill(Color(.systemGray5))
+                        .fill(AppTheme.Colors.progressTrack(colorScheme))
                         .frame(height: height)
 
                     Capsule()

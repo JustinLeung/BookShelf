@@ -3,17 +3,19 @@ import SwiftUI
 struct QuoteOfTheDayCard: View {
     @Bindable var viewModel: BookshelfViewModel
 
+    @Environment(\.colorScheme) private var colorScheme
+
     var body: some View {
         if let quote = viewModel.randomQuote() {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
                     Image(systemName: "quote.opening")
-                        .foregroundStyle(Color.accentColor)
+                        .foregroundStyle(AppTheme.Colors.terracotta)
                     Spacer()
                 }
 
                 Text(quote.text)
-                    .font(.subheadline)
+                    .font(.system(.subheadline, design: .serif))
                     .italic()
                     .lineLimit(4)
 
@@ -23,13 +25,14 @@ struct QuoteOfTheDayCard: View {
                         .foregroundStyle(.tertiary)
                 }
             }
-            .padding()
-            .background(Color.accentColor.opacity(0.06))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(AppTheme.Layout.cardPadding)
+            .background(AppTheme.Colors.cardBackground(colorScheme))
+            .clipShape(RoundedRectangle(cornerRadius: AppTheme.Layout.cardCornerRadius))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.accentColor.opacity(0.15), lineWidth: 1)
+                RoundedRectangle(cornerRadius: AppTheme.Layout.cardCornerRadius)
+                    .stroke(AppTheme.Colors.terracotta.opacity(0.15), lineWidth: 1)
             )
+            .shadow(color: AppTheme.Colors.espresso.opacity(colorScheme == .light ? 0.06 : 0.15), radius: 4, x: 0, y: 2)
         }
     }
 }

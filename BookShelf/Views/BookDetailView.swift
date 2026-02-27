@@ -127,8 +127,7 @@ struct BookDetailView: View {
             if headerCollapse < 1 {
                 VStack(spacing: 8) {
                     Text(book.title)
-                        .font(.title2)
-                        .fontWeight(.bold)
+                        .font(AppTheme.Typography.sectionTitle)
                         .multilineTextAlignment(.center)
 
                     Text(book.authorsDisplay)
@@ -248,9 +247,7 @@ struct BookDetailView: View {
                             .lineLimit(4)
                             .italic(note.noteType == .quote)
                     }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .themedCard()
                     .contextMenu {
                         Button(role: .destructive) {
                             viewModel.deleteNote(note)
@@ -463,9 +460,7 @@ struct BookDetailView: View {
                         }
                     }
                 }
-                .padding()
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .themedCard()
             }
         }
         .padding(.horizontal)
@@ -647,6 +642,7 @@ private struct ScrollOffsetKey: PreferenceKey {
 struct DetailSection<Content: View>: View {
     let title: String
     @ViewBuilder let content: () -> Content
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -656,7 +652,7 @@ struct DetailSection<Content: View>: View {
                     .frame(width: 3, height: 18)
 
                 Text(title)
-                    .font(.headline)
+                    .font(AppTheme.Typography.cardTitle)
                     .foregroundStyle(.primary)
             }
 
@@ -664,12 +660,9 @@ struct DetailSection<Content: View>: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding()
-        .background(Color(.systemGray6).opacity(0.7))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(Color(.systemGray5), lineWidth: 0.5)
-        )
+        .background(AppTheme.Colors.cardBackground(colorScheme))
+        .clipShape(RoundedRectangle(cornerRadius: AppTheme.Layout.cardCornerRadius))
+        .shadow(color: AppTheme.Colors.espresso.opacity(colorScheme == .light ? 0.06 : 0.15), radius: 4, x: 0, y: 2)
     }
 }
 

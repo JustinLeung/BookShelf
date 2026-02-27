@@ -21,8 +21,7 @@ struct WeeklySummaryCard: View {
         if hasStats {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Weekly Summary")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
+                    .font(AppTheme.Typography.cardTitle)
 
                 HStack(spacing: 0) {
                     summaryItem(value: "\(weekPages)", label: "Pages")
@@ -32,17 +31,14 @@ struct WeeklySummaryCard: View {
                     summaryItem(value: "\(booksInProgress)", label: "In Progress")
                 }
             }
-            .padding()
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .themedCard()
         }
     }
 
     private func summaryItem(value: String, label: String) -> some View {
         VStack(spacing: 2) {
             Text(value)
-                .font(.title3)
-                .fontWeight(.bold)
+                .font(.system(.title3, design: .serif, weight: .bold))
             Text(label)
                 .font(.caption2)
                 .foregroundStyle(.secondary)

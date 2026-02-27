@@ -36,7 +36,7 @@ struct ProgressUpdateView: View {
         NavigationStack {
             VStack(spacing: 24) {
                 Text(book.title)
-                    .font(.headline)
+                    .font(.system(.headline, design: .serif))
                     .multilineTextAlignment(.center)
                     .padding(.top)
 

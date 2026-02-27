@@ -3,6 +3,7 @@ import VisionKit
 
 struct AddBookView: View {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.colorScheme) private var colorScheme
     @Bindable var viewModel: BookshelfViewModel
 
     @State private var searchText = ""
@@ -50,8 +51,8 @@ struct AddBookView: View {
                     }
                 }
                 .padding(12)
-                .background(Color(.systemGray6))
-                .clipShape(RoundedRectangle(cornerRadius: 10))
+                .background(AppTheme.Colors.cardBackground(colorScheme))
+                .clipShape(RoundedRectangle(cornerRadius: AppTheme.Layout.smallCornerRadius))
                 .padding(.horizontal)
                 .padding(.top, 8)
 

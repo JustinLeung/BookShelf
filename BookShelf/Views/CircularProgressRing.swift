@@ -6,6 +6,7 @@ struct CircularProgressRing: View {
     var lineWidth: CGFloat = 12
     var showPercentage: Bool = true
 
+    @Environment(\.colorScheme) private var colorScheme
     @State private var animatedProgress: Double = 0
 
     private var clampedProgress: Double {
@@ -16,7 +17,7 @@ struct CircularProgressRing: View {
         ZStack {
             // Background track
             Circle()
-                .stroke(Color(.systemGray5), lineWidth: lineWidth)
+                .stroke(AppTheme.Colors.progressTrack(colorScheme), lineWidth: lineWidth)
 
             // Filled arc
             Circle()
@@ -35,7 +36,7 @@ struct CircularProgressRing: View {
             // Percentage label
             if showPercentage {
                 Text("\(Int(animatedProgress * 100))%")
-                    .font(.system(size: size * 0.22, weight: .bold, design: .rounded))
+                    .font(.system(size: size * 0.22, weight: .bold, design: .serif))
                     .contentTransition(.numericText())
             }
         }

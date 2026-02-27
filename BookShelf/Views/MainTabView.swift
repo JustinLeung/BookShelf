@@ -33,6 +33,7 @@ struct MainTabView: View {
                     .padding(.bottom, 49) // tab bar height
             }
         }
+        .tint(.accentColor)
     }
 }
 

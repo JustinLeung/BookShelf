@@ -3,6 +3,7 @@ import SwiftUI
 struct CurrentlyReadingView: View {
     @Bindable var viewModel: BookshelfViewModel
     @Bindable var timerViewModel: ReadingTimerViewModel
+    @Environment(\.colorScheme) private var colorScheme
     @State private var showAddBook = false
 
     private var currentlyReadingBooks: [Book] {
@@ -89,15 +90,12 @@ struct CurrentlyReadingView: View {
                     } label: {
                         HStack(spacing: 6) {
                             Image(systemName: "pause.circle.fill")
-                                .foregroundStyle(.orange)
+                                .foregroundStyle(AppTheme.Colors.amber)
                             Text("Paused (\(pausedBooks.count))")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
+                                .font(AppTheme.Typography.cardTitle)
                         }
                     }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .themedCard()
                 }
 
                 WeeklyActivityChart(viewModel: viewModel)
@@ -108,6 +106,7 @@ struct CurrentlyReadingView: View {
             }
             .padding()
         }
+        .background(AppTheme.Colors.pageBackground(colorScheme))
         .refreshable {
             viewModel.fetchBooks()
         }
@@ -117,13 +116,12 @@ struct CurrentlyReadingView: View {
         VStack(spacing: 16) {
             Image(systemName: "book.fill")
                 .font(.system(size: 36))
-                .foregroundStyle(Color.accentColor)
+                .foregroundStyle(AppTheme.Colors.terracotta)
                 .frame(width: 80, height: 80)
-                .background(Circle().fill(Color.accentColor.opacity(0.08)))
+                .background(Circle().fill(AppTheme.Colors.terracotta.opacity(0.08)))
 
             Text("No Books in Progress")
-                .font(.title3)
-                .fontWeight(.semibold)
+                .font(.system(.title3, design: .serif, weight: .semibold))
 
             Text("Start reading a book from your library to see it here")
                 .font(.subheadline)

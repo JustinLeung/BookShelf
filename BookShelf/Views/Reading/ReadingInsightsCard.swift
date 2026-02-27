@@ -7,13 +7,8 @@ struct ReadingInsightsCard: View {
         let insights = gatherInsights()
         if !insights.isEmpty {
             VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    Image(systemName: "lightbulb.fill")
-                        .foregroundStyle(.yellow)
-                    Text("Insights")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                }
+                Text("Insights")
+                    .font(AppTheme.Typography.cardTitle)
 
                 ForEach(Array(insights.enumerated()), id: \.offset) { _, insight in
                     HStack(alignment: .top, spacing: 8) {
@@ -27,9 +22,7 @@ struct ReadingInsightsCard: View {
                     }
                 }
             }
-            .padding()
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .themedCard()
         }
     }
 

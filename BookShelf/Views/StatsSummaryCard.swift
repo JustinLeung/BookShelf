@@ -2,6 +2,7 @@ import SwiftUI
 
 struct StatsSummaryCard: View {
     @Bindable var viewModel: BookshelfViewModel
+    @Environment(\.colorScheme) private var colorScheme
 
     private var streak: Int { viewModel.currentStreak() }
     private var totalBooks: Int { viewModel.totalBooksRead }
@@ -53,14 +54,14 @@ struct StatsSummaryCard: View {
                             Text(challenge.aheadBy >= 0 ? "\(challenge.aheadBy) ahead" : "\(abs(challenge.aheadBy)) behind")
                                 .font(.caption)
                                 .fontWeight(.medium)
-                                .foregroundStyle(challenge.aheadBy >= 0 ? Color.green : Color.orange)
+                                .foregroundStyle(challenge.aheadBy >= 0 ? AppTheme.Colors.sage : AppTheme.Colors.amber)
                         }
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 RoundedRectangle(cornerRadius: 3)
-                                    .fill(Color(.systemGray4))
+                                    .fill(AppTheme.Colors.progressTrack(colorScheme))
                                 RoundedRectangle(cornerRadius: 3)
-                                    .fill(challenge.booksRead >= challenge.goal ? Color.green : Color.accentColor)
+                                    .fill(challenge.booksRead >= challenge.goal ? AppTheme.Colors.sage : Color.accentColor)
                                     .frame(width: geo.size.width * min(1.0, Double(challenge.booksRead) / Double(max(challenge.goal, 1))))
                             }
                         }
@@ -77,7 +78,7 @@ struct StatsSummaryCard: View {
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
                                 RoundedRectangle(cornerRadius: 3)
-                                    .fill(Color(.systemGray4))
+                                    .fill(AppTheme.Colors.progressTrack(colorScheme))
                                 RoundedRectangle(cornerRadius: 3)
                                     .fill(Color.accentColor)
                                     .frame(width: geo.size.width * min(1.0, Double(progress.pagesRead) / Double(progress.goal)))
@@ -87,10 +88,8 @@ struct StatsSummaryCard: View {
                     }
                 }
             }
-            .padding()
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color(.systemGray6))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .themedCard()
             .padding(.horizontal)
         }
     }

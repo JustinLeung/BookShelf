@@ -37,7 +37,7 @@ struct BookCoverView: View {
             RoundedRectangle(cornerRadius: cornerRadius)
                 .fill(
                     LinearGradient(
-                        colors: [Color.accentColor.opacity(0.18), Color.accentColor.opacity(0.08)],
+                        colors: [AppTheme.Colors.terracotta.opacity(0.18), AppTheme.Colors.espresso.opacity(0.10)],
                         startPoint: .topLeading,
                         endPoint: .bottomTrailing
                     )
@@ -45,7 +45,7 @@ struct BookCoverView: View {
 
             // Spine line on left edge
             RoundedRectangle(cornerRadius: 1)
-                .fill(Color.accentColor.opacity(0.2))
+                .fill(AppTheme.Colors.espresso.opacity(0.2))
                 .frame(width: 3)
 
             VStack {

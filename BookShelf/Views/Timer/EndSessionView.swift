@@ -23,8 +23,7 @@ struct EndSessionView: View {
                         .foregroundStyle(.green)
 
                     Text("Session Complete")
-                        .font(.title2)
-                        .fontWeight(.bold)
+                        .font(AppTheme.Typography.sectionTitle)
 
                     Text(timerViewModel.formattedTime)
                         .font(.title)
@@ -65,9 +64,7 @@ struct EndSessionView: View {
                             .foregroundStyle(.secondary)
                         }
                     }
-                    .padding()
-                    .background(Color(.systemGray6))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .themedCard()
                 }
 
                 Spacer()
